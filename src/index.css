@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ------------------------------------------------------------------
+   ClaimSahayak design tokens — "the claims dossier"
+   Warm paper, forest ink, acid chart for action, mint/brick/crimson
+   for verdict semantics. No purple, no default UI fonts, no gradients-as-decor.
+------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    /* shadcn bridge (HSL triplets of the brand palette) */
+    --background: 44 46% 91%;          /* paper  #f2ecdc */
+    --foreground: 133 50% 11%;         /* ink    #0e2a22 */
+    --card: 43 37% 87%;                /* paper-2 #eae3d1 */
+    --card-foreground: 133 50% 11%;
+    --popover: 44 46% 91%;
+    --popover-foreground: 133 50% 11%;
+    --primary: 133 50% 11%;
+    --primary-foreground: 44 46% 91%;
+    --secondary: 43 37% 87%;
+    --secondary-foreground: 133 50% 11%;
+    --muted: 43 30% 84%;
+    --muted-foreground: 137 16% 34%;   /* ink-3 */
+    --accent: 76 90% 62%;              /* chart  #c8f547 */
+    --accent-foreground: 133 50% 11%;
+    --destructive: 348 70% 53%;        /* crimson #db3356 */
+    --destructive-foreground: 44 46% 91%;
+    --border: 133 20% 78%;
+    --input: 133 20% 70%;
+    --ring: 44 88% 59%;                /* brick  #f3c13a */
+    --radius: 0.5rem;
+
+    /* brand tokens (hex, consumed directly) */
+    --paper: #f2ecdc;
+    --paper-2: #eae3d1;
+    --paper-3: #d9d2c2;
+    --ink: #0e2a22;
+    --ink-3: #46605a;
+    --chart: #c8f547;
+    --mint: #9be5b9;
+    --brick: #f3c13a;
+    --crimson: #db3356;
+    --line: color-mix(in srgb, var(--ink) 13%, transparent);
+    --line-faint: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Instrument Sans", "Noto Sans Devanagari", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--chart);
+    color: var(--ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--brick);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  /* thin themed scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ink) 30%, transparent) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--ink) 30%, transparent);
+    border-radius: 10px;
+  }
+}
+
+@layer components {
+  /* uppercase mono kicker with live pulse dot */
+  .kicker {
+    font-family: "IBM Plex Mono", "Noto Sans Devanagari", monospace;
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--crimson);
+    animation: pulse-ring 1.8s ease-out infinite;
+  }
+  .pulse-dot.ok {
+    background: var(--ink);
+    animation-name: pulse-ring-ink;
+  }
+  /* hairline panel — spacing & dividers instead of nested cards */
+  .panel {
+    border: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .panel-2 {
+    border: 1px solid var(--line);
+    background: var(--paper-2);
+  }
+  /* severity left-border system for alerts */
+  .flag {
+    border-left: 3px solid var(--crimson);
+  }
+  .flag.warn {
+    border-left-color: var(--brick);
+  }
+  .flag.good {
+    border-left-color: color-mix(in srgb, var(--mint) 70%, var(--ink));
+  }
+  /* ledger table */
+  .ledger td,
+  .ledger th {
+    border-bottom: 1px dashed var(--line-faint);
+  }
+}
+
+/* verdict stamp — rotating circular text ring */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.stamp-ring {
+  animation: spin-slow 22s linear infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--crimson) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+@keyframes pulse-ring-ink {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ink) 40%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 9px transparent;
+  }
+}
+
+/* staggered verdict reveal — one orchestrated sequence, not scattered fades */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.5s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+
+/* dotted connector for the payable waterfall */
+.waterfall-join {
+  background-image: linear-gradient(var(--line) 55%, transparent 45%);
+  background-size: 1px 7px;
+  background-repeat: repeat-y;
+  width: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stamp-ring,
+  .pulse-dot,
+  .rise {
+    animation: none !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
