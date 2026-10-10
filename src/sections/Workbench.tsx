@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BillLine, CaseFile } from '../engine/types'
 import {
   STANDARD_DOCS,
@@ -14,6 +14,7 @@ import { hindiRejectionSummary, hindiSummary } from '../engine/hindi'
 import { formatINR, formatDate } from '../engine/format'
 import { fileToDocTextSmart, ocrFile } from '../engine/ocr'
 import { pdfToText } from '../engine/pdf'
+import { caseStore, type StoredCaseMeta } from '../engine/store'
 import { extractCaseWithGemini, loadGeminiKey, storedPersonalKey } from '../engine/gemini'
 import { CASE_LABELS, SAMPLE_CASES } from '../data/samples'
 import { PanelTitle } from '../components/kit'
@@ -28,6 +29,95 @@ const BAND_LABEL: Record<string, string> = {
   strong: 'Claim-ready',
   fair: 'File with fixes',
   weak: 'Do not file yet',
+}
+
+/* ---------- saved cases (consent-gated, 6.4) ---------- */
+
+function SavedCases({ current, onPick }: { current: CaseFile; onPick: (c: CaseFile) => void }) {
+  // Consent is read on every render — a cheap localStorage read that keeps the
+  // panel in sync with the Settings toggle without an event bus.
+  const consent = caseStore.loadConsent()
+  const [cases, setCases] = useState<StoredCaseMeta[] | null>(null)
+  const [note, setNote] = useState<string | null>(null)
+
+  const refresh = useCallback(() => {
+    caseStore.listCases().then(setCases, (e: Error) => setNote(e.message))
+  }, [])
+  useEffect(() => {
+    if (!consent) return
+    let cancelled = false
+    caseStore.listCases().then(
+      (c) => { if (!cancelled) setCases(c) },
+      (e: Error) => { if (!cancelled) setNote(e.message) },
+    )
+    return () => { cancelled = true }
+  }, [consent])
+
+  if (!consent) return null
+
+  const save = async () => {
+    setNote(null)
+    try {
+      await caseStore.saveCase(current.id, current.claimant, JSON.stringify(current))
+      setNote('Saved to your case history.')
+      refresh()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Save failed.')
+    }
+  }
+  const load = async (id: string) => {
+    setNote(null)
+    try {
+      const stored = await caseStore.loadCase(id)
+      onPick(JSON.parse(stored.payload) as CaseFile)
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Load failed.')
+    }
+  }
+  const remove = async (id: string) => {
+    setNote(null)
+    try {
+      await caseStore.deleteCase(id)
+      refresh()
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Delete failed.')
+    }
+  }
+
+  return (
+    <div>
+      <PanelTitle
+        right={
+          <button onClick={save} className="min-h-11 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3 hover:text-ink">
+            Save this case
+          </button>
+        }
+      >
+        Saved cases
+      </PanelTitle>
+      {cases && cases.length === 0 && (
+        <p className="text-xs leading-relaxed text-ink-3">Nothing saved yet. Saved cases and their documents are stored for 30 days.</p>
+      )}
+      <ul className="space-y-1">
+        {(cases ?? []).map((c) => (
+          <li key={c.id} className="flex items-center justify-between gap-2 border border-line px-3 py-2">
+            <button onClick={() => load(c.id)} className="min-h-11 min-w-0 flex-1 text-left">
+              <span className="block truncate text-sm font-medium">{c.name}</span>
+              <span className="block font-mono text-[10px] text-ink-3">{c.savedAt.slice(0, 10)}</span>
+            </button>
+            <button
+              onClick={() => remove(c.id)}
+              aria-label={`Delete saved case ${c.name}`}
+              className="flex min-h-11 min-w-11 items-center justify-center font-mono text-[11px] text-crimson-deep hover:bg-paper-2"
+            >
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
+      {note && <p className="mt-2 text-xs leading-relaxed text-ink-3">{note}</p>}
+    </div>
+  )
 }
 
 /* ---------- left rail ---------- */
@@ -105,6 +195,8 @@ function CaseRail({
             : 'Managed key — live extraction on. Add your own in Settings (top right) to override.'}
         </p>
       </div>
+
+      <SavedCases current={current} onPick={onPick} />
 
       <div>
         <PanelTitle>Policy terms read</PanelTitle>
@@ -747,6 +839,11 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
         })
         docs.push(d)
         setBusyNote(null)
+        if (caseStore.loadConsent()) {
+          // Best-effort archive of the raw document (30-day lifecycle bucket);
+          // analysis must never block on the store.
+          caseStore.uploadDocument(f).catch(() => {})
+        }
       }
       const empty = docs.filter((d) => d.text.trim().length < 40)
       if (empty.length === docs.length) {

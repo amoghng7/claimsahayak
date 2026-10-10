@@ -76,7 +76,7 @@ jobs:
             --cpu=1 \
             --min-instances=0 \
             --max-instances=3 \
-            --set-env-vars="VERTEX_PROJECT=${{ env.PROJECT_ID }},VERTEX_LOCATION=global,VERTEX_MODEL=gemini-3.8-flash,DOCAI_PROJECT=${{ env.PROJECT_ID }},DOCAI_LOCATION=us,DOCAI_PROCESSOR=2444e192b91c508e" \
+            --set-env-vars="VERTEX_PROJECT=${{ env.PROJECT_ID }},VERTEX_LOCATION=global,VERTEX_MODEL=gemini-3.8-flash,DOCAI_PROJECT=${{ env.PROJECT_ID }},DOCAI_LOCATION=us,DOCAI_PROCESSOR=2444e192b91c508e,FIRESTORE_PROJECT=${{ env.PROJECT_ID }},GCS_BUCKET=claimsahayak-docs-599879020255" \
             --project=${{ env.PROJECT_ID }}
 
       - name: Show deployment URL

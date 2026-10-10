@@ -44,7 +44,7 @@ describe('fileToDocTextSmart', () => {
     let ocrCalled = false
     const d = await fileToDocTextSmart(makeFile('policy.pdf', 'application/pdf', 'bytes'), {
       ...deps,
-      ocr: async (f) => { ocrCalled = true; return deps.ocr(f) },
+      ocr: async () => { ocrCalled = true; return deps.ocr() },
     })
     expect(d.text).toContain('SELECTABLE TEXT LAYER')
     expect(d.ocr).toBe(false)

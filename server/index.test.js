@@ -217,3 +217,154 @@ describe('POST /ocr', () => {
     assert.equal(res.statusCode, 405)
   })
 })
+
+/* ---------- /api/cases + /api/uploads (Phase 06 step 6.4 — consent-gated persistence) ---------- */
+
+describe('POST /api/cases/:caseId', () => {
+  const store = { project: 'p' }
+  const genConfig = { project: 'p', location: 'global', model: 'm' }
+  const SID = '11111111-2222-4333-8444-555555555555'
+
+  function storeReq(method, url, body, sessionId = SID) {
+    const r = req(method, url, body)
+    r.headers['x-session-id'] = sessionId
+    return r
+  }
+
+  it('writes the case document to Firestore under the session', async () => {
+    const calls = []
+    const handler = createHandler({
+      config: { ...genConfig, store, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, opts })
+        return { status: 200, text: async () => '{"name":"doc"}' }
+      },
+    })
+    const res = mockRes()
+    await handler(storeReq('PUT', '/api/cases/case-1', JSON.stringify({ name: 'Ramesh', payload: '{"a":1}' })), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(calls.length, 1)
+    assert.match(calls[0].url, /firestore\.googleapis\.com\/v1\/projects\/p\/databases\/\(default\)\/documents\/sessions\/11111111-2222-4333-8444-555555555555\/cases\/case-1/)
+    assert.equal(calls[0].opts.method, 'PATCH')
+    assert.equal(calls[0].opts.headers.Authorization, 'Bearer tok')
+    const sent = JSON.parse(calls[0].opts.body)
+    assert.equal(sent.fields.name.stringValue, 'Ramesh')
+    assert.equal(sent.fields.payload.stringValue, '{"a":1}')
+    assert.ok(sent.fields.savedAt.timestampValue)
+  })
+
+  it('answers 401 when the session id is missing or malformed', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, store, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(storeReq('PUT', '/api/cases/case-1', '{}', 'not-a-uuid'), res)
+    assert.equal(res.statusCode, 401)
+    const res2 = mockRes()
+    await handler(req('PUT', '/api/cases/case-1', '{}'), res2)
+    assert.equal(res2.statusCode, 401)
+  })
+
+  it('answers 503 when Firestore is not configured', async () => {
+    const handler = createHandler({
+      config: genConfig,
+      getToken: async () => 'tok',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(storeReq('PUT', '/api/cases/case-1', '{}'), res)
+    assert.equal(res.statusCode, 503)
+  })
+
+  it('GET /api/cases lists the session cases (id, name, savedAt)', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, store, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async () => ({
+        status: 200,
+        text: async () => JSON.stringify({
+          documents: [{
+            name: 'projects/p/databases/(default)/documents/sessions/' + SID + '/cases/case-1',
+            fields: {
+              name: { stringValue: 'Ramesh' },
+              savedAt: { timestampValue: '2026-10-11T00:00:00Z' },
+              payload: { stringValue: '{"a":1}' },
+            },
+          }],
+        }),
+      }),
+    })
+    const res = mockRes()
+    await handler(storeReq('GET', '/api/cases'), res)
+    assert.equal(res.statusCode, 200)
+    assert.deepEqual(JSON.parse(res.body), {
+      cases: [{ id: 'case-1', name: 'Ramesh', savedAt: '2026-10-11T00:00:00Z' }],
+    })
+  })
+
+  it('GET /api/cases/:id returns the stored payload', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, store, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async () => ({
+        status: 200,
+        text: async () => JSON.stringify({
+          fields: { name: { stringValue: 'R' }, savedAt: { timestampValue: 't' }, payload: { stringValue: '{"a":1}' } },
+        }),
+      }),
+    })
+    const res = mockRes()
+    await handler(storeReq('GET', '/api/cases/case-1'), res)
+    assert.equal(res.statusCode, 200)
+    assert.deepEqual(JSON.parse(res.body), { name: 'R', savedAt: 't', payload: '{"a":1}' })
+  })
+
+  it('DELETE /api/cases/:id deletes the document', async () => {
+    const calls = []
+    const handler = createHandler({
+      config: { ...genConfig, store, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, opts })
+        return { status: 200, text: async () => '{}' }
+      },
+    })
+    const res = mockRes()
+    await handler(storeReq('DELETE', '/api/cases/case-1'), res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(calls[0].opts.method, 'DELETE')
+    assert.match(calls[0].url, /\/cases\/case-1$/)
+  })
+
+  it('POST /api/uploads streams the body to GCS under the session prefix', async () => {
+    const calls = []
+    const handler = createHandler({
+      config: { ...genConfig, store, bucket: 'claimsahayak-docs' },
+      getToken: async () => 'tok',
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, opts })
+        return { status: 200, text: async () => '{"name":"obj"}' }
+      },
+    })
+    const res = mockRes()
+    await handler(storeReq('POST', '/api/uploads?name=bill.pdf', 'PDFBYTES'), res)
+    assert.equal(res.statusCode, 200)
+    assert.match(calls[0].url, /upload\/storage\/v1\/b\/claimsahayak-docs\/o\?uploadType=media&name=/)
+    assert.match(calls[0].url, /uploads%2F11111111-2222-4333-8444-555555555555%2F/)
+    assert.equal(calls[0].opts.body, 'PDFBYTES')
+  })
+
+  it('POST /api/uploads is 503 when no bucket is configured', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, store },
+      getToken: async () => 'tok',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(storeReq('POST', '/api/uploads?name=bill.pdf', 'x'), res)
+    assert.equal(res.statusCode, 503)
+  })
+})

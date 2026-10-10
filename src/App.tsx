@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Landing } from './sections/Landing'
 import { Workbench } from './sections/Workbench'
+import { caseStore } from './engine/store'
 import {
   isDevKeyMissing,
   maskKey,
@@ -29,6 +30,7 @@ function SettingsSheet({
   // Mounted only while open — initial state is always the current stored key.
   const [stored] = useState<string | null>(() => storedPersonalKey())
   const [draft, setDraft] = useState('')
+  const [serverSave, setServerSave] = useState(() => caseStore.loadConsent())
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Modal focus management: focus the field on open, restore focus to the
@@ -111,6 +113,27 @@ function SettingsSheet({
               Remove my key
             </button>
           )}
+        </div>
+        <div className="mt-6 border-t border-line pt-5">
+          <label className="flex min-h-11 cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={serverSave}
+              onChange={(e) => {
+                caseStore.setConsent(e.target.checked)
+                setServerSave(e.target.checked)
+              }}
+              className="mt-1 h-4 w-4 accent-[var(--chart)]"
+            />
+            <span>
+              <span className="text-sm font-medium">Save my cases on the server</span>
+              <span className="mt-1 block text-xs leading-relaxed text-ink-3">
+                Off by default — documents and analysis stay in this browser. Turn on to
+                keep a case history under an anonymous session id (no account). Uploaded
+                documents are stored with it and deleted automatically after 30 days.
+              </span>
+            </span>
+          </label>
         </div>
         <p className="mt-4 font-mono text-[10px] leading-relaxed text-ink-3">
           With your own key, requests go straight from your browser to Google.
