@@ -49,12 +49,12 @@ function CaseRail({
     <div className="space-y-6">
       <div>
         <PanelTitle>Case files</PanelTitle>
-        <div className="space-y-1">
+        <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-0 lg:space-y-1 lg:overflow-visible lg:pb-0">
           {SAMPLE_CASES.map((c) => (
             <button
               key={c.id}
               onClick={() => onPick(c)}
-              className={`w-full text-left px-3 py-2.5 border transition-colors duration-150 ${
+              className={`w-full min-w-[210px] lg:min-w-0 text-left px-3 py-2.5 border transition-colors duration-150 ${
                 current.id === c.id ? 'border-ink bg-paper-2' : 'border-line hover:bg-paper-2/60'
               }`}
             >
@@ -169,26 +169,36 @@ function Waterfall({ v }: { v: Verdict }) {
     ['Expected settlement', p.expected, 'color-mix(in srgb, var(--mint) 55%, var(--paper))', false],
   )
   return (
-    <div className="ledger font-mono text-[12.5px]">
-      {rows.map(([label, amount, color, signed], i) => (
-        <div key={label} className="rise" style={{ animationDelay: `${i * 70}ms` }}>
-          {i > 0 && <div className="waterfall-join ml-2 h-3" aria-hidden />}
-          <div className="flex items-center justify-between gap-4 px-3 py-2.5 border border-line" style={{ background: i === rows.length - 1 ? color : 'transparent' }}>
-            <span className={i === rows.length - 1 ? 'font-semibold' : 'text-ink-3'}>{label}</span>
-            <span className="flex items-center gap-3">
-              <span className="inline-block h-2 w-16" aria-hidden>
+    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Settlement waterfall — scroll horizontally">
+      <div className="ledger font-mono text-[12.5px]">
+        {rows.map(([label, amount, color, signed], i) => {
+          const last = i === rows.length - 1
+          return (
+            <div key={label} className="rise min-w-[560px]" style={{ animationDelay: `${i * 70}ms` }}>
+              {i > 0 && <div className="waterfall-join ml-2 h-3" aria-hidden />}
+              <div className="flex items-center justify-between gap-4 px-3 py-2.5 border border-line" style={{ background: last ? color : 'transparent' }}>
                 <span
-                  className="block h-full"
-                  style={{ width: `${Math.max(2, (Math.abs(amount) / p.total) * 100)}%`, background: color }}
-                />
-              </span>
-              <span className="font-semibold tabular-nums">
-                {signed && amount !== 0 ? `−${formatINR(Math.abs(amount))}` : formatINR(amount)}
-              </span>
-            </span>
-          </div>
-        </div>
-      ))}
+                  className={`sticky left-0 pr-2 ${last ? 'font-semibold' : 'text-ink-3'}`}
+                  style={{ background: last ? color : 'var(--paper)' }}
+                >
+                  {label}
+                </span>
+                <span className="flex items-center gap-3 whitespace-nowrap">
+                  <span className="inline-block h-2 w-16" aria-hidden>
+                    <span
+                      className="block h-full"
+                      style={{ width: `${Math.max(2, (Math.abs(amount) / p.total) * 100)}%`, background: color }}
+                    />
+                  </span>
+                  <span className="font-semibold tabular-nums">
+                    {signed && amount !== 0 ? `−${formatINR(Math.abs(amount))}` : formatINR(amount)}
+                  </span>
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -197,7 +207,11 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
   return (
     <div className="space-y-10">
       <div className="flex flex-wrap items-center gap-8 border-b border-line pb-8">
-        <ScoreStamp score={v.score} band={v.band} />
+        <div className="h-[120px] w-[120px] overflow-hidden lg:h-[188px] lg:w-[188px]">
+          <div className="origin-top-left scale-[0.64] lg:scale-100">
+            <ScoreStamp score={v.score} band={v.band} />
+          </div>
+        </div>
         <div className="min-w-56 flex-1">
           <span className={`inline-block rounded-full px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${BAND_CHIP[v.band]}`}>
             {BAND_LABEL[v.band]}
@@ -578,17 +592,17 @@ function BillLedger({
       >
         Bill lines — check the extraction
       </PanelTitle>
-      <div className="border border-line">
+      <div className="border border-line overflow-x-auto" tabIndex={0} role="region" aria-label="Bill lines editor — scroll horizontally">
         {lines.map((l, i) => (
           <div
             key={i}
-            className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-line-faint last:border-0"
+            className="flex flex-nowrap items-center gap-2 px-3 py-2 min-w-[640px] border-b border-line-faint last:border-0"
           >
             <input
               value={l.head}
               aria-label="Line item"
               onChange={(e) => update(i, { head: e.target.value })}
-              className="min-w-40 flex-1 bg-transparent text-[13px] focus:outline-none focus:ring-1 focus:ring-brick"
+              className="sticky left-0 w-44 shrink-0 bg-paper text-[13px] focus:outline-none focus:ring-1 focus:ring-brick lg:w-auto lg:min-w-40 lg:flex-1"
             />
             {l.edited && (
               <span className="font-mono text-[9px] uppercase tracking-wider text-brick">edited</span>
@@ -613,7 +627,7 @@ function BillLedger({
             </button>
           </div>
         ))}
-        <div className="flex items-center justify-between gap-4 border-t border-line bg-paper-2/60 px-3 py-2.5">
+        <div className="flex items-center justify-between gap-4 border-t border-line bg-paper-2/60 px-3 py-2.5 min-w-[640px]">
           <button
             type="button"
             onClick={() => onChange([...lines, { head: 'New charge', amount: 0, roomLinked: false, edited: true }])}
