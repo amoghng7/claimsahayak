@@ -1,5 +1,5 @@
 import type { BillLine, CaseFile, HospitalEpisode, Policy } from './types'
-import { daysBetween, yearsBetween } from './format'
+import { addMonths, daysBetween, formatDate, monthsBetween, yearsBetween } from './format'
 
 /* ------------------------------------------------------------------ */
 /* IRDAI-standard hospitalisation claim document checklist             */
@@ -123,6 +123,82 @@ export function exclusionCheck(policy: Policy, ep: HospitalEpisode): ExclusionCh
 }
 
 /* ------------------------------------------------------------------ */
+/* PED waiting period                                                  */
+/* ------------------------------------------------------------------ */
+
+/** IRDAI (Insurance Products) Regulations 2024 — PED waits are capped at 36 months. */
+export const PED_WAIT_CAP_MONTHS = 36
+
+/** Colloquial ↔ clinical aliases for the PEDs most often declared. */
+const PED_SYNONYMS: string[][] = [
+  ['diabetes', 'diabetic', 'sugar'],
+  ['hypertension', 'high blood pressure', 'bp'],
+  ['thyroid'],
+  ['asthma', 'asthmatic'],
+  ['arthritis', 'arthritic'],
+]
+
+function pedVariants(declared: string): string[] {
+  const variants = new Set<string>([declared])
+  for (const group of PED_SYNONYMS) {
+    if (group.some((v) => containsKeyword(declared, v))) group.forEach((v) => variants.add(v))
+  }
+  return [...variants]
+}
+
+export interface PedWaitingResult {
+  matchedPed: string | null
+  monthsSinceStart: number
+  /** effective wait — an extracted value above the IRDAI cap is capped and flagged */
+  waitMonths: number
+  nonCompliant: boolean
+  breach: boolean
+  nearingCompletion: boolean
+  completesOn: string | null
+  excludedLines: BillLine[]
+  excludedAmount: number
+}
+
+export function pedWaitingCheck(policy: Policy, ep: HospitalEpisode): PedWaitingResult {
+  const extractedWait = policy.pedWaitMonths ?? PED_WAIT_CAP_MONTHS
+  const nonCompliant = extractedWait > PED_WAIT_CAP_MONTHS
+  const waitMonths = Math.min(extractedWait, PED_WAIT_CAP_MONTHS)
+  const monthsSinceStart = monthsBetween(policy.inceptionDate, ep.admissionDate)
+
+  const treatmentText = `${ep.diagnosis} ${ep.procedure}`
+  let matchedPed: string | null = null
+  let matchedVariants: string[] = []
+  for (const declared of policy.pedsDeclared) {
+    const variants = pedVariants(declared)
+    if (variants.some((v) => containsKeyword(treatmentText, v))) {
+      matchedPed = declared
+      matchedVariants = variants
+      break
+    }
+  }
+
+  const breach = matchedPed !== null && monthsSinceStart < waitMonths
+  // A breach in the wait's last 3 months is a timing problem, not a dead
+  // claim — render it as the amber "completes on" note instead of crimson.
+  const nearingCompletion = breach && waitMonths - monthsSinceStart <= 3
+  const completesOn = matchedPed !== null ? addMonths(policy.inceptionDate, waitMonths) : null
+  const excludedLines = breach
+    ? ep.billLines.filter((l) => matchedVariants.some((v) => containsKeyword(l.head, v)))
+    : []
+  return {
+    matchedPed,
+    monthsSinceStart,
+    waitMonths,
+    nonCompliant,
+    breach,
+    nearingCompletion,
+    completesOn,
+    excludedLines,
+    excludedAmount: excludedLines.reduce((s, l) => s + l.amount, 0),
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Waiting periods                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -168,6 +244,7 @@ export interface PayableEstimate {
   roomCut: number
   proportionalCut: number
   exclusionCut: number
+  pedCut: number
   nonPayableCut: number
   copayCut: number
   expected: number
@@ -176,21 +253,24 @@ export interface PayableEstimate {
 export function estimatePayable(c: CaseFile): PayableEstimate {
   const ep = c.episode
   const excl = exclusionCheck(c.policy, ep)
-  const excluded = new Set(excl.excludedLines)
+  const ped = pedWaitingCheck(c.policy, ep)
+  const excluded = new Set([...excl.excludedLines, ...ped.excludedLines])
   const rr = roomRentAnalysis(c.policy, ep, (l) => excluded.has(l))
   const roomCut = rr?.roomCut ?? 0
   const proportionalCut = rr?.proportionalCut ?? 0
   const exclusionCut = excl.excludedAmount
+  const pedCut = ped.excludedAmount
   const nonPayableCut = ep.billLines
     .filter((l) => l.nonPayable && !excluded.has(l))
     .reduce((s, l) => s + l.amount, 0)
-  const admissible = Math.max(0, ep.totalBill - roomCut - proportionalCut - exclusionCut - nonPayableCut)
+  const admissible = Math.max(0, ep.totalBill - roomCut - proportionalCut - exclusionCut - pedCut - nonPayableCut)
   const copayCut = (admissible * c.policy.copayPct) / 100
   return {
     total: ep.totalBill,
     roomCut,
     proportionalCut,
     exclusionCut,
+    pedCut,
     nonPayableCut,
     copayCut,
     expected: Math.max(0, admissible - copayCut),
@@ -204,7 +284,7 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
 export type Band = 'strong' | 'fair' | 'weak'
 
 export interface DeductionFlag {
-  kind: 'room_rent' | 'proportional' | 'copay' | 'non_payable' | 'waiting' | 'exclusion'
+  kind: 'room_rent' | 'proportional' | 'copay' | 'non_payable' | 'waiting' | 'exclusion' | 'ped'
   severity: 'high' | 'medium'
   title: string
   detail: string
@@ -227,6 +307,7 @@ export interface Verdict {
   roomRent: RoomRentAnalysis | null
   waiting: WaitingFlag[]
   exclusions: ExclusionCheck
+  ped: PedWaitingResult
 }
 
 export function buildVerdict(c: CaseFile): Verdict {
@@ -234,6 +315,7 @@ export function buildVerdict(c: CaseFile): Verdict {
   const waiting = waitingPeriodCheck(c)
   const payable = estimatePayable(c)
   const exclusions = exclusionCheck(c.policy, c.episode)
+  const ped = pedWaitingCheck(c.policy, c.episode)
   const rr = roomRentAnalysis(c.policy, c.episode)
   const flags: DeductionFlag[] = []
   const reasons: Reason[] = []
@@ -285,6 +367,39 @@ export function buildVerdict(c: CaseFile): Verdict {
     reasons.push({ ok: false, label: `Permanent exclusion hit: ${exclusions.hits[0]}` })
   }
 
+  if (ped.nonCompliant) {
+    flags.push({
+      kind: 'ped',
+      severity: 'medium',
+      title: 'Non-compliant policy term: PED wait above the IRDAI cap',
+      detail: `The schedule states a ${c.policy.pedWaitMonths}-month PED waiting period, but IRDAI caps it at 36 months — the excess is unenforceable. This estimate applies the 36-month cap.`,
+      amountAtRisk: 0,
+      clause: 'IRDAI (Insurance Products) Regulations, 2024 — PED waiting period capped at 36 months of continuous coverage.',
+    })
+  }
+
+  if (ped.breach && !ped.nearingCompletion) {
+    score -= 30
+    flags.push({
+      kind: 'ped',
+      severity: 'high',
+      title: `PED waiting period not served — ${ped.matchedPed}`,
+      detail: `"${ped.matchedPed}" was declared at proposal and this admission (${ped.monthsSinceStart} months into the policy) falls inside its ${ped.waitMonths}-month wait. Treatment-linked lines are excluded from the estimate.`,
+      amountAtRisk: ped.excludedAmount > 0 ? ped.excludedAmount : payable.expected,
+      clause: 'Policy schedule — PED waiting period; IRDAI (Insurance Products) Regulations, 2024 (36-month cap).',
+    })
+    reasons.push({ ok: false, label: `PED wait breach: ${ped.matchedPed} at month ${ped.monthsSinceStart} of ${ped.waitMonths}` })
+  } else if (ped.nearingCompletion && ped.completesOn) {
+    flags.push({
+      kind: 'ped',
+      severity: 'medium',
+      title: `Waiting period completes on ${formatDate(ped.completesOn)}`,
+      detail: `"${ped.matchedPed}" is inside its PED wait window, but the wait ends within 3 months. If treatment can safely wait past that date, the claim clears this clause.`,
+      amountAtRisk: 0,
+      clause: 'Policy schedule — PED waiting period; IRDAI (Insurance Products) Regulations, 2024.',
+    })
+  }
+
   if (waiting.length > 0) {
     score -= 30
     for (const w of waiting) {
@@ -329,7 +444,7 @@ export function buildVerdict(c: CaseFile): Verdict {
 
   score = Math.max(0, Math.min(100, Math.round(score)))
   const band: Band = score >= 75 ? 'strong' : score >= 50 ? 'fair' : 'weak'
-  return { score, band, reasons, missing, flags, payable, roomRent: rr, waiting, exclusions }
+  return { score, band, reasons, missing, flags, payable, roomRent: rr, waiting, exclusions, ped }
 }
 
 /* ------------------------------------------------------------------ */

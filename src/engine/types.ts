@@ -15,7 +15,10 @@ export interface Policy {
   roomRent: RoomRentLimit
   copayPct: number
   initialWaitingDays: number
-  pedWaitingYears: number
+  /** PED waiting period in months; absent → the 36-month IRDAI cap applies */
+  pedWaitMonths?: number
+  /** pre-existing diseases declared on the proposal form */
+  pedsDeclared: string[]
   specificWaitingYears: number
   specificDiseases: string[]
   /** permanent exclusions as printed in the policy schedule */

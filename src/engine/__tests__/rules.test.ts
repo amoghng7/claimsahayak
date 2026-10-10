@@ -7,6 +7,7 @@ import {
   estimatePayable,
   exclusionCheck,
   missingDocs,
+  pedWaitingCheck,
   roomRentAnalysis,
   waitingPeriodCheck,
 } from '../rules'
@@ -24,7 +25,8 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
     roomRent: { type: 'no_limit' },
     copayPct: 0,
     initialWaitingDays: 30,
-    pedWaitingYears: 3,
+    pedWaitMonths: 36,
+    pedsDeclared: [],
     specificWaitingYears: 2,
     specificDiseases: ['Cataract'],
     exclusions: [],
@@ -206,6 +208,110 @@ describe('exclusionCheck — permanent exclusions (AUD-11)', () => {
     expect(chk.hits).toHaveLength(0)
     expect(chk.excludedAmount).toBe(0)
     expect(estimatePayable(c).exclusionCut).toBe(0)
+  })
+})
+
+describe('pedWaitingCheck — PED waiting-period scoring (AUD-12)', () => {
+  function diabeticCase(inceptionDate: string, pedWaitMonths = 36) {
+    const c = makeCase({
+      policy: makePolicy({ inceptionDate, pedWaitMonths, pedsDeclared: ['Diabetes mellitus'] }),
+    })
+    c.episode.admissionDate = '2026-06-01'
+    c.episode.diagnosis = 'Diabetic foot ulcer'
+    c.episode.procedure = 'Wound debridement'
+    c.episode.billLines = [
+      { head: 'Room & nursing charges', amount: 12000, roomLinked: false, isRoomRent: true },
+      { head: 'Diabetic wound care kit', amount: 5000, roomLinked: false },
+      { head: 'Medicines', amount: 8000, roomLinked: false },
+    ]
+    c.episode.totalBill = 25000
+    return c
+  }
+
+  it('declared PED admitted at month 14 of a 36-month wait → breach, treatment lines excluded, score −30', () => {
+    const c = diabeticCase('2025-04-01')
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.matchedPed).toBe('Diabetes mellitus')
+    expect(ped.monthsSinceStart).toBe(14)
+    expect(ped.breach).toBe(true)
+    expect(ped.excludedAmount).toBe(5000)
+    const p = estimatePayable(c)
+    expect(p.pedCut).toBe(5000)
+    expect(p.expected).toBe(20000)
+    const v = buildVerdict(c)
+    // 100 − 8 (3 optional docs) − 30 (PED breach) = 62
+    expect(v.score).toBe(62)
+    expect(v.flags.some((f) => f.kind === 'ped' && f.severity === 'high')).toBe(true)
+  })
+
+  it('the same admission at month 37 is clean', () => {
+    const c = diabeticCase('2023-05-01')
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.monthsSinceStart).toBe(37)
+    expect(ped.breach).toBe(false)
+    expect(ped.excludedAmount).toBe(0)
+    expect(estimatePayable(c).expected).toBe(25000)
+    expect(buildVerdict(c).score).toBe(92)
+  })
+
+  it('synonyms match — declared "Hypertension" fires on "high blood pressure"', () => {
+    const c = makeCase({
+      policy: makePolicy({ inceptionDate: '2025-04-01', pedsDeclared: ['Hypertension'] }),
+    })
+    c.episode.admissionDate = '2026-06-01'
+    c.episode.diagnosis = 'High blood pressure crisis'
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.matchedPed).toBe('Hypertension')
+    expect(ped.breach).toBe(true)
+  })
+
+  it('synonyms match — declared "Diabetes" fires on "sugar"', () => {
+    const c = makeCase({
+      policy: makePolicy({ inceptionDate: '2025-04-01', pedsDeclared: ['Diabetes'] }),
+    })
+    c.episode.admissionDate = '2026-06-01'
+    c.episode.diagnosis = 'Uncontrolled sugar with ketoacidosis'
+    expect(pedWaitingCheck(c.policy, c.episode).breach).toBe(true)
+  })
+
+  it('breach in the wait’s last 3 months → amber "completes on" note instead of the crimson flag, no score penalty', () => {
+    const c = diabeticCase('2023-08-01') // month 34 of 36
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.breach).toBe(true)
+    expect(ped.nearingCompletion).toBe(true)
+    expect(ped.completesOn).toBe('2026-08-01')
+    // filing today still loses the treatment-linked lines
+    expect(estimatePayable(c).pedCut).toBe(5000)
+    const v = buildVerdict(c)
+    expect(v.flags.some((f) => f.kind === 'ped' && f.severity === 'medium')).toBe(true)
+    expect(v.flags.some((f) => f.kind === 'ped' && f.severity === 'high')).toBe(false)
+    expect(v.score).toBe(92) // no score penalty for a timing note
+  })
+
+  it('no declared PEDs → nothing to check', () => {
+    const c = makeCase({ policy: makePolicy({ inceptionDate: '2025-04-01' }) })
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.matchedPed).toBeNull()
+    expect(ped.breach).toBe(false)
+  })
+
+  it('an extracted wait above 36 months is non-compliant and capped at 36', () => {
+    const c = diabeticCase('2023-06-01', 48) // month 36 of a stated 48
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.nonCompliant).toBe(true)
+    expect(ped.waitMonths).toBe(36)
+    expect(ped.breach).toBe(false) // the unlawful extra 12 months do not bind
+  })
+
+  it('missing pedWaitMonths defaults to the 36-month IRDAI cap', () => {
+    const policy = makePolicy({ inceptionDate: '2025-04-01', pedsDeclared: ['Asthma'] })
+    delete policy.pedWaitMonths
+    const c = makeCase({ policy })
+    c.episode.admissionDate = '2026-06-01'
+    c.episode.diagnosis = 'Acute asthma exacerbation'
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.waitMonths).toBe(36)
+    expect(ped.breach).toBe(true)
   })
 })
 

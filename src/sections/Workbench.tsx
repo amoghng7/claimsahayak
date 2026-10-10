@@ -118,7 +118,7 @@ function CaseRail({
                   : 'No cap stated',
             ],
             ['Co-pay', current.policy.copayPct > 0 ? `${current.policy.copayPct}%` : 'None'],
-            ['PED wait', `${current.policy.pedWaitingYears} yrs`],
+            ['PED wait', `${current.policy.pedWaitMonths ?? 36} mo`],
             ['Since', formatDate(current.policy.inceptionDate)],
           ].map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3 border-b border-dashed border-line-faint py-1.5">

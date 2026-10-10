@@ -21,7 +21,8 @@ export const SAMPLE_CASES: CaseFile[] = [
       roomRent: { type: 'percent_si', value: 1 },
       copayPct: 0,
       initialWaitingDays: 30,
-      pedWaitingYears: 3,
+      pedWaitMonths: 36,
+      pedsDeclared: [],
       specificWaitingYears: 2,
       specificDiseases: ['Cataract', 'Hernia', 'Hydrocele', 'Cholecystitis', 'Knee replacement'],
       exclusions: [
@@ -70,7 +71,8 @@ export const SAMPLE_CASES: CaseFile[] = [
       roomRent: { type: 'no_limit' },
       copayPct: 0,
       initialWaitingDays: 30,
-      pedWaitingYears: 3,
+      pedWaitMonths: 36,
+      pedsDeclared: [],
       specificWaitingYears: 2,
       specificDiseases: ['Cataract', 'Hernia', 'Knee replacement'],
       exclusions: [
@@ -127,7 +129,8 @@ export const SAMPLE_CASES: CaseFile[] = [
       roomRent: { type: 'percent_si', value: 1 },
       copayPct: 20,
       initialWaitingDays: 30,
-      pedWaitingYears: 3,
+      pedWaitMonths: 36,
+      pedsDeclared: ['Hypertension'],
       specificWaitingYears: 2,
       specificDiseases: ['Cataract', 'Hernia', 'Hydrocele', 'Joint replacement'],
       exclusions: [

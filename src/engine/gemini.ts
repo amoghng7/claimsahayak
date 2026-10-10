@@ -27,7 +27,8 @@ From the document texts below, produce ONE JSON object with EXACTLY this shape
     "inceptionDate": "YYYY-MM-DD", "sumInsured": number,
     "roomRent": { "type": "percent_si" | "daily_cap" | "no_limit" | "single_room", "value": number | null },
     "copayPct": number, "initialWaitingDays": number,
-    "pedWaitingYears": number, "specificWaitingYears": number,
+    "pedWaitMonths": number | null, "pedsDeclared": string[],
+    "specificWaitingYears": number,
     "specificDiseases": string[],
     "exclusions": string[]
   },
@@ -48,6 +49,7 @@ Rules:
 - providedDocIds must use ids from: claim-form, discharge-summary, final-bill, investigations, prescriptions, pharmacy, policy-copy, kyc, neft, fir, implant.
 - roomLinked = true for heads that insurers tie to room category (surgeon/ consultant fees, nursing, OT charges); isRoomRent = true for the room & nursing rent line itself; nonPayable = true for consumables (gloves, masks, syringes, etc.).
 - exclusions = the policy schedule's permanent exclusions as short labels (e.g. "Cosmetic surgery", "Dental treatment").
+- pedWaitMonths = the PED waiting period in months (null if the document does not state one); pedsDeclared = pre-existing diseases declared on the proposal form.
 - All money in INR numbers, dates ISO.
 
 DOCUMENTS:
@@ -120,6 +122,7 @@ function toCaseFile(data: z.infer<typeof extractionSchema>): CaseFile {
     patientAge: data.patientAge,
     policy: {
       ...data.policy,
+      pedWaitMonths: data.policy.pedWaitMonths ?? undefined,
       roomRent: { type: data.policy.roomRent.type, value: data.policy.roomRent.value ?? undefined },
     },
     episode: data.episode,
