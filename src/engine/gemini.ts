@@ -65,7 +65,16 @@ export interface DocText {
 const UNREADABLE_ERROR =
   'The document could not be read reliably — try a clearer scan or enter the details manually.'
 
-async function requestGemini(apiKey: string, prompt: string): Promise<string> {
+/**
+ * One JSON-mode Gemini call. Shared by the extraction path and any other
+ * structured-output feature (e.g. the rejection-letter classifier) — the
+ * caller supplies the responseSchema and does its own validation/retries.
+ */
+export async function requestGeminiJson(
+  apiKey: string,
+  prompt: string,
+  responseSchema: object,
+): Promise<string> {
   const body = {
     contents: [
       {
@@ -75,7 +84,7 @@ async function requestGemini(apiKey: string, prompt: string): Promise<string> {
     ],
     generationConfig: {
       responseMimeType: 'application/json',
-      responseSchema: EXTRACTION_RESPONSE_SCHEMA,
+      responseSchema,
       temperature: 0,
     },
   }
@@ -138,7 +147,7 @@ export async function extractCaseWithGemini(apiKey: string, docs: DocText[]): Pr
   let prompt = basePrompt
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const text = await requestGemini(apiKey, prompt)
+    const text = await requestGeminiJson(apiKey, prompt, EXTRACTION_RESPONSE_SCHEMA)
     let raw: unknown
     try {
       raw = JSON.parse(text)

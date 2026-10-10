@@ -511,6 +511,10 @@ export interface RejectionVerdict {
   explanation: string
   steps: string[]
   clauses: string[]
+  /** set when the Gemini fallback classifier (not the regex) produced the category */
+  aiAssisted?: boolean
+  /** the model's plain-language restatement, shown as advisory when it could not classify confidently */
+  advisory?: string
 }
 
 interface Pattern {
@@ -648,6 +652,10 @@ export function analyzeRejection(c: CaseFile, letter: string): RejectionVerdict 
       return { patternId: p.id, reason: p.reason, ...p.assess(c) }
     }
   }
+  return unknownRejection()
+}
+
+function unknownRejection(): RejectionVerdict {
   return {
     patternId: 'unknown',
     reason: 'Unclassified rejection ground',
@@ -660,4 +668,14 @@ export function analyzeRejection(c: CaseFile, letter: string): RejectionVerdict 
     ],
     clauses: ['IRDAI PPI Master Circular 2024 — grievance redressal timelines (14 days) and escalation route.'],
   }
+}
+
+/**
+ * Re-run a known pattern's deterministic assessment by id — used by the AI
+ * fallback classifier so the model picks the category but the engine still
+ * writes the explanation, steps and clauses.
+ */
+export function assessPattern(c: CaseFile, patternId: string): RejectionVerdict | null {
+  const p = PATTERNS.find((p) => p.id === patternId)
+  return p ? { patternId: p.id, reason: p.reason, ...p.assess(c) } : null
 }

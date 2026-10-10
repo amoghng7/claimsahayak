@@ -76,6 +76,42 @@ export const extractionSchema = z.object({
 export type ExtractionPayload = z.infer<typeof extractionSchema>
 
 /**
+ * Rejection-letter classification output (fallback path in rejection.ts).
+ * The model only classifies; the six known categories mirror the pattern ids
+ * in rules.ts so the deterministic assess step can re-run for a match.
+ */
+export const REJECTION_CATEGORIES = [
+  'ped-nondisclosure',
+  'waiting',
+  'deficiency',
+  'delay',
+  'room',
+  'exclusion',
+  'genuinely-other',
+] as const
+
+export const rejectionClassifySchema = z.object({
+  category: z.enum(REJECTION_CATEGORIES),
+  confidence: z.number().min(0).max(1),
+  citedClause: z.string(),
+  plainLanguageReason: z.string(),
+})
+
+export type RejectionClassification = z.infer<typeof rejectionClassifySchema>
+
+/** Mirrors rejectionClassifySchema — keep the two in sync. */
+export const REJECTION_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    category: { type: 'STRING', enum: [...REJECTION_CATEGORIES] },
+    confidence: { type: 'NUMBER' },
+    citedClause: { type: 'STRING' },
+    plainLanguageReason: { type: 'STRING' },
+  },
+  required: ['category', 'confidence', 'citedClause', 'plainLanguageReason'],
+} as const
+
+/**
  * OpenAPI-3-subset schema sent to Gemini as generationConfig.responseSchema,
  * so malformed output is rejected at the API level too. Mirrors the zod
  * schemas above — keep the two in sync.
