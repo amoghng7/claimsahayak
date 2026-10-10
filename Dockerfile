@@ -23,9 +23,9 @@ COPY server/package.json server/package-lock.json /app/server/
 RUN cd /app/server && npm ci --omit=dev --ignore-scripts
 COPY server/index.js /app/server/
 
-# Official nginx entrypoint runs /docker-entrypoint.d/*.sh before nginx
-COPY docker-entrypoint.d/40-sidecar.sh /docker-entrypoint.d/40-sidecar.sh
-RUN chmod +x /docker-entrypoint.d/40-sidecar.sh
+# Startup: sidecar first (with a health wait), then the official nginx entrypoint
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 # Copy built assets
 COPY --from=build /app/dist /usr/share/nginx/html
@@ -33,4 +33,4 @@ COPY --from=build /app/dist /usr/share/nginx/html
 # Cloud Run uses PORT env var (default 8080)
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/start.sh"]
