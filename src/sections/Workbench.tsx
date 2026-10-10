@@ -177,9 +177,9 @@ function Waterfall({ v }: { v: Verdict }) {
           return (
             <div key={label} className="rise min-w-[560px]" style={{ animationDelay: `${i * 70}ms` }}>
               {i > 0 && <div className="waterfall-join ml-2 h-3" aria-hidden />}
-              <div className="flex items-center justify-between gap-4 px-3 py-2.5 border border-line" style={{ background: last ? color : 'transparent' }}>
+              <div className="flex items-center justify-between gap-4 pr-3 py-2.5 border border-line" style={{ background: last ? color : 'transparent' }}>
                 <span
-                  className={`sticky left-0 pr-2 ${last ? 'font-semibold' : 'text-ink-3'}`}
+                  className={`sticky left-0 pl-3 pr-2 ${last ? 'font-semibold' : 'text-ink-3'}`}
                   style={{ background: last ? color : 'var(--paper)' }}
                 >
                   {label}
@@ -598,13 +598,13 @@ function BillLedger({
         {lines.map((l, i) => (
           <div
             key={i}
-            className="flex flex-nowrap items-center gap-2 px-3 py-2 min-w-[640px] border-b border-line-faint last:border-0"
+            className="flex flex-nowrap items-center gap-2 pr-3 py-2 min-w-[640px] border-b border-line-faint last:border-0"
           >
             <input
               value={l.head}
               aria-label="Line item"
               onChange={(e) => update(i, { head: e.target.value })}
-              className="sticky left-0 w-44 shrink-0 bg-paper text-[13px] focus:outline-none focus:ring-1 focus:ring-brick lg:w-auto lg:min-w-40 lg:flex-1"
+              className="sticky left-0 w-44 shrink-0 bg-paper pl-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-brick lg:w-auto lg:min-w-40 lg:flex-1"
             />
             {l.edited && (
               <span className="font-mono text-[9px] uppercase tracking-wider text-brick">edited</span>
