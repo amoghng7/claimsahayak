@@ -12,7 +12,8 @@ import { analyzeRejectionWithFallback, parseRejectionDate } from '../engine/reje
 import { buildEscalationLadder, buildGrievanceLetter, type EscalationStep } from '../engine/grievance'
 import { hindiRejectionSummary, hindiSummary } from '../engine/hindi'
 import { formatINR, formatDate } from '../engine/format'
-import { fileToDocText } from '../engine/pdf'
+import { fileToDocTextSmart, ocrFile } from '../engine/ocr'
+import { pdfToText } from '../engine/pdf'
 import { extractCaseWithGemini, loadGeminiKey, storedPersonalKey } from '../engine/gemini'
 import { CASE_LABELS, SAMPLE_CASES } from '../data/samples'
 import { PanelTitle } from '../components/kit'
@@ -36,12 +37,14 @@ function CaseRail({
   onPick,
   onFiles,
   busy,
+  busyNote,
   uploadNote,
 }: {
   current: CaseFile
   onPick: (c: CaseFile) => void
   onFiles: (files: FileList) => void
   busy: boolean
+  busyNote: string | null
   uploadNote: string | null
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -71,7 +74,7 @@ function CaseRail({
       </nav>
 
       <div>
-        <PanelTitle right={busy ? <span className="font-mono text-[10px] text-ink-3">reading…</span> : undefined}>
+        <PanelTitle right={busy ? <span className="font-mono text-[10px] text-ink-3">{busyNote ?? 'reading…'}</span> : undefined}>
           Your documents
         </PanelTitle>
         <button
@@ -82,13 +85,13 @@ function CaseRail({
           <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
             Drop policy + bill PDFs
           </div>
-          <div className="mt-1 text-xs text-ink-3">or .txt exports — read locally, extracted with Gemini</div>
+          <div className="mt-1 text-xs text-ink-3">or .txt exports / photos — read locally, extracted with Gemini; scans go through OCR</div>
         </button>
         <input
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.txt,.md"
+          accept=".pdf,.txt,.md,image/*"
           className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) onFiles(e.target.files)
@@ -666,6 +669,7 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
   const [aiBusy, setAiBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const [uploadNote, setUploadNote] = useState<string | null>(null)
+  const [busyNote, setBusyNote] = useState<string | null>(null)
 
   // The editor owns bill lines; everything downstream (verdict, Hindi summary,
   // grievance, export) derives from this single recomputed CaseFile.
@@ -732,19 +736,34 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
     setBusy(true)
     setUploadNote(null)
     try {
-      const docs = await Promise.all(Array.from(files).map(fileToDocText))
+      const docs = []
+      for (const f of Array.from(files)) {
+        const d = await fileToDocTextSmart(f, {
+          extractPdfText: pdfToText,
+          ocr: async (file) => {
+            setBusyNote('image-based document, verifying quality…')
+            return ocrFile(file)
+          },
+        })
+        docs.push(d)
+        setBusyNote(null)
+      }
       const empty = docs.filter((d) => d.text.trim().length < 40)
       if (empty.length === docs.length) {
-        setUploadNote('Those PDFs look like scanned images with no text layer. Export text (or photograph → OCR) and try again.')
+        setUploadNote('Could not read any text from those files — even with OCR. Try a sharper photo or a text export.')
         return
       }
       const extracted = await extractCaseWithGemini(key, docs)
       pick({ ...extracted, rejectionLetter: extracted.rejectionLetter })
-      setUploadNote(`Read ${docs.length} document${docs.length > 1 ? 's' : ''} — verdict rebuilt from your file.`)
+      const ocrCount = docs.filter((d) => d.ocr).length
+      setUploadNote(
+        `Read ${docs.length} document${docs.length > 1 ? 's' : ''}${ocrCount ? ` (${ocrCount} via OCR)` : ''} — verdict rebuilt from your file.`,
+      )
     } catch (err) {
       setUploadNote(err instanceof Error ? err.message : 'Extraction failed — the sample files still work.')
     } finally {
       setBusy(false)
+      setBusyNote(null)
     }
   }
 
@@ -761,7 +780,7 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
     <div className="mx-auto max-w-shell px-6 py-8">
       <div className="grid gap-8 lg:grid-cols-[280px_1fr_360px]" data-print-hidden>
         <aside aria-label="Case files and policy terms" className="min-w-0">
-          <CaseRail current={caseFile} onPick={pick} onFiles={onFiles} busy={busy} uploadNote={uploadNote} />
+          <CaseRail current={caseFile} onPick={pick} onFiles={onFiles} busy={busy} busyNote={busyNote} uploadNote={uploadNote} />
         </aside>
 
         <main className="min-w-0 space-y-10">

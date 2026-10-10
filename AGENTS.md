@@ -85,13 +85,15 @@ src/
     gemini.ts         Gemini extraction call (zod-validated, one retry) + API-key helpers
     schemas.ts        zod schemas + responseSchema constraining Gemini's output
     pdf.ts            pdf.js text-layer extraction
+    ocr.ts            OCR fallback: empty text layer / images → /api/ocr (Document AI)
     format.ts         ₹ Indian-format / date helpers (en-IN locale)
-    __tests__/        vitest specs for rules, rejection, grievance, hindi, gemini
+    __tests__/        vitest specs for rules, rejection, grievance, hindi, gemini, ocr
   data/samples.ts     three synthetic case files (all people/insurers fictional)
   sections/           Landing.tsx, Workbench.tsx (three-column desk UI)
   components/         kit.tsx (Kicker, NumberedSection, PanelTitle), ScoreStamp.tsx
 server/
-  index.js            sidecar routes: POST /generate → Vertex AI (ADC), GET /healthz
+  index.js            sidecar routes: POST /generate → Vertex AI (ADC),
+                      POST /ocr → Document AI :process (ADC), GET /healthz
   index.test.js       node --test specs (handler is dependency-injected: token + fetch)
 docker-entrypoint.d/  40-sidecar.sh starts the sidecar before nginx (official entrypoint)
 infra/                gcloud scripts per Phase 06 step (06-1-vertex.sh, …)
@@ -109,8 +111,11 @@ Module conventions:
 ## Runtime data flow
 
 1. Workbench starts from `SAMPLE_CASES` (demo mode, zero setup) or user-uploaded files.
-2. Uploads: `pdf.ts` extracts text locally (text layer only — scanned PDFs yield nothing
-   and the UI warns), text is truncated to 30,000 chars per file.
+2. Uploads: `pdf.ts` extracts text locally; when the text layer is empty (scanned/
+   photographed bill) or the file is an image, `ocr.ts` sends it through same-origin
+   `/api/ocr` → sidecar → **Cloud Document AI** OCR (`us` multi-region processor —
+   Document AI has no `asia-south1` location), and the OCR text feeds the same
+   extraction schema. Text is truncated to 30,000 chars per file.
 3. `gemini.ts` sends the text to Gemini `gemini-3.8-flash` with a fixed JSON-shape prompt
    (temperature 0, `responseMimeType: application/json` + a `responseSchema` from
    `schemas.ts`), validates the response with zod (`extractionSchema.safeParse`),

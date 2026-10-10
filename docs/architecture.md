@@ -18,13 +18,14 @@ flowchart LR
     end
 
     subgraph cloudrun["Cloud Run — asia-south1 (single container, two processes)"]
-        NGINX["nginx\nSPA static + security headers/CSP\nPOST-only proxy /api/gemini/generate\nrate limit 20 req/min/IP, 4 MB cap"]
-        SIDECAR["Node sidecar — server/\nVertex AI via ADC (service account)\nno API key material anywhere"]
-        NGINX -->|"127.0.0.1:8081/generate"| SIDECAR
+        NGINX["nginx\nSPA static + security headers/CSP\nPOST-only proxies /api/gemini/generate, /api/ocr\nrate limit 20 req/min/IP"]
+        SIDECAR["Node sidecar — server/\nVertex AI + Document AI via ADC\n(service account) — no API key material"]
+        NGINX -->|"127.0.0.1:8081"| SIDECAR
     end
 
     subgraph google["Google Cloud"]
         VERTEX["Vertex AI — Gemini\ngemini-3.8-flash, global endpoint, JSON mode\nextraction ONLY — temperature 0,\nzod-validated response schema"]
+        DOCAI["Document AI — OCR processor\n(us multi-region)\nscanned/photographed bills only"]
         LOGS["Cloud Logging\nper-request audit (IAM-governed)"]
     end
 
@@ -36,7 +37,10 @@ flowchart LR
     end
 
     UI -->|"POST /api/gemini/generate\n(same-origin, no key in browser)"| NGINX
+    PDF -.->|"scanned/photo only:\nPOST /api/ocr"| NGINX
     SIDECAR -->|"ADC access token"| VERTEX
+    SIDECAR -->|"ADC access token"| DOCAI
+    DOCAI -->|"OCR text"| SIDECAR
     VERTEX -->|"structured JSON facts"| SIDECAR --> NGINX --> UI
     SIDECAR -.-> LOGS
     UI -.->|"engine recomputes score,\nwaterfall, verdict from facts"| ENGINE
@@ -61,8 +65,9 @@ flowchart LR
 
 ## Request flow (upload path)
 
-1. Browser extracts PDF text locally with pdf.js (scanned PDFs yield nothing and the
-   UI says so — OCR is Phase 06 step 6.2).
+1. Browser extracts PDF text locally with pdf.js. If the text layer is empty (scan) or
+   the file is a photo, the browser POSTs it to same-origin `/api/ocr`; the sidecar runs
+   Cloud Document AI OCR and returns text, which then follows the same extraction path.
 2. Browser POSTs the extraction prompt to the same-origin `/api/gemini/generate`.
 3. nginx rate-limits, caps body size, and forwards to the sidecar (127.0.0.1:8081),
    which calls Vertex AI with an ADC token.

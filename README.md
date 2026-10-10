@@ -14,9 +14,10 @@ in the same reduced ratio. On a ₹4.2 lakh surgery that single choice quietly r
 
 ## What it does
 
-1. **Document ingestion** — upload policy schedule, discharge summary, itemised bill (PDF text
-   layer read locally with pdf.js, structured by Gemini), or explore three bundled synthetic
-   case files with zero setup.
+1. **Document ingestion** — upload policy schedule, discharge summary, itemised bill (PDF
+   text layer read locally with pdf.js; scanned or photographed documents go through
+   Cloud Document AI OCR via the same-origin proxy), structured by Gemini — or explore
+   three bundled synthetic case files with zero setup.
 2. **Claim-readiness score (0–100)** — with explicit reasons, never just a number.
 3. **Document checklist** vs the IRDAI-standard hospitalisation claim list — mandatory gaps
    flagged with *why each document exists*.
@@ -105,7 +106,7 @@ no key material anywhere. Further hardening (Phase 06, `plan/06-production-backe
 | Concern | This repo (post-6.1) | Next steps |
 |---|---|---|
 | Extraction | **Vertex AI** (Gemini) behind the Cloud Run sidecar, IAM-governed | per-request audit dashboards |
-| Scanned PDFs | text-layer only | **Document AI** OCR pipeline (6.2) |
+| Scanned PDFs | **Document AI** OCR via the sidecar's `/api/ocr` (6.2 done) | form-parser upgrade for bills |
 | Edge protection | nginx rate limit | **Cloud Armor** + budget/monitoring alerts (6.3) |
 | Storage | none (stateless) | consent-gated **Firestore** + **Cloud Storage** (6.4) |
 
