@@ -279,13 +279,11 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
 /* ---------- right rail: rejection desk, letter, Hindi ---------- */
 
 function RejectionDesk({
-  c,
   letter,
   setLetter,
   analysis,
   onAnalyze,
 }: {
-  c: CaseFile
   letter: string
   setLetter: (s: string) => void
   analysis: RejectionVerdict | null
@@ -460,7 +458,6 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
 
         <aside className="space-y-8">
           <RejectionDesk
-            c={caseFile}
             letter={letter}
             setLetter={setLetter}
             analysis={analysis}
