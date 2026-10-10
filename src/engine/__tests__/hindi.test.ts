@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildVerdict } from '../rules'
-import { hindiSummary } from '../hindi'
+import { analyzeRejection, buildVerdict } from '../rules'
+import { hindiRejectionSummary, hindiSummary } from '../hindi'
 import { SAMPLE_CASES } from '../../data/samples'
 import type { CaseFile } from '../types'
 
@@ -33,5 +33,34 @@ describe('hindiSummary', () => {
       ),
     )
     expect(bands).toEqual(new Set(['strong', 'fair', 'weak']))
+  })
+})
+
+describe('hindiRejectionSummary', () => {
+  const arvind = SAMPLE_CASES[2]
+  const verdict = analyzeRejection(arvind, arvind.rejectionLetter!)
+  const lines = hindiRejectionSummary(arvind, verdict)
+  const text = lines.join('\n')
+
+  it('states the insurer\'s ground and the rejected amount', () => {
+    expect(text).toContain(verdict.reason)
+    expect(text).toContain('₹3,60,000')
+  })
+
+  it('says the rejection is reversible and names the next step', () => {
+    expect(text).toContain('उलटा जा सकता')
+    expect(text).toContain('अगला कदम')
+    expect(text).toContain(verdict.steps[0])
+  })
+
+  it('carries the escalation timeline and the disclaimer', () => {
+    expect(text).toContain('14 दिनों')
+    expect(text).toContain('बीमा लोकपाल')
+    expect(text).toContain('सलाह नहीं')
+  })
+
+  it('renders in Devanagari with Latin numerals', () => {
+    expect(text).toMatch(DEVANAGARI)
+    expect(text).not.toMatch(/[०-९]/) // no Devanagari digits
   })
 })

@@ -1,5 +1,5 @@
 import type { CaseFile } from './types'
-import type { Verdict } from './rules'
+import type { RejectionVerdict, Verdict } from './rules'
 import { formatINR } from './format'
 
 /**
@@ -44,6 +44,43 @@ export function hindiSummary(c: CaseFile, v: Verdict): string[] {
 
   lines.push(
     `अनुमानित भुगतान: ${formatINR(c.episode.totalBill)} के बिल में से लगभग ${formatINR(v.payable.expected)} मिलने की उम्मीद है (कटौतियों के बाद)।`,
+  )
+
+  lines.push('नोट: यह एक सहायक विश्लेषण है, बीमा या कानूनी सलाह नहीं। अंतिम निर्णय बीमा कंपनी का होता है।')
+
+  return lines
+}
+
+/**
+ * Hindi (Devanagari) summary of a rejection analysis — what the insurer said,
+ * whether the desk agrees, and the next step. Same template discipline as
+ * hindiSummary: wording is fixed, only the figures and grounds change.
+ */
+export function hindiRejectionSummary(c: CaseFile, rej: RejectionVerdict): string[] {
+  const lines: string[] = []
+
+  lines.push(
+    `बीमा कंपनी ने ${formatINR(c.episode.totalBill)} का दावा खारिज किया है — बताया गया कारण: "${rej.reason}"।`,
+  )
+
+  if (rej.reversible === 'yes') {
+    lines.push(
+      'हमारे विश्लेषण के अनुसार यह खारिज करना उलटा जा सकता है। नीचे दिए गए कारण और नियम इसके खिलाफ लिखित जवाब में काम आएँगे।',
+    )
+  } else if (rej.reversible === 'partial') {
+    lines.push(
+      'हमारे विश्लेषण के अनुसार यह मामला आंशिक रूप से जीता जा सकता है — पॉलिसी की सटीक शर्त और कटौती का हिसाब जाँचना होगा।',
+    )
+  } else {
+    lines.push('हमारे विश्लेषण के अनुसार इस खारिज को पलटना कठिन है, फिर भी लिखित जवाब और रिकॉर्ड बनाना सही रहेगा।')
+  }
+
+  if (rej.steps.length > 0) {
+    lines.push(`अगला कदम: ${rej.steps[0]}`)
+  }
+
+  lines.push(
+    'समय सीमा: बीमा कंपनी के शिकायत निवारण अधिकारी (GRO) को लिखित शिकायत भेजें — जवाब 14 दिनों में मिलना चाहिए। न मिले तो बीमा बरोसा पोर्टल या बीमा लोकपाल (एक साल के भीतर)।',
   )
 
   lines.push('नोट: यह एक सहायक विश्लेषण है, बीमा या कानूनी सलाह नहीं। अंतिम निर्णय बीमा कंपनी का होता है।')
