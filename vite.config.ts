@@ -6,7 +6,7 @@ import { defineConfig } from "vite"
 // Loaded dynamically so the repo builds anywhere.
 let inspectPlugin: import('vite').PluginOption[] = []
 try {
-  // @ts-ignore — optional platform plugin, not published to npm
+  // @ts-expect-error — optional platform plugin, not published to npm; import fails only when absent
   const mod = await import('kimi-plugin-inspect-react')
   inspectPlugin = [mod.inspectAttr()]
 } catch {
