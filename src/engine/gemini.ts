@@ -1,4 +1,6 @@
 import type { CaseFile } from './types'
+import { EXTRACTION_RESPONSE_SCHEMA, extractionSchema } from './schemas'
+import type { z } from 'zod'
 
 /**
  * Live extraction path: raw document text → structured CaseFile via the
@@ -54,22 +56,26 @@ export interface DocText {
   text: string
 }
 
-export async function extractCaseWithGemini(apiKey: string, docs: DocText[]): Promise<CaseFile> {
+const UNREADABLE_ERROR =
+  'The document could not be read reliably — try a clearer scan or enter the details manually.'
+
+async function requestGemini(apiKey: string, prompt: string): Promise<string> {
   const body = {
     contents: [
       {
         role: 'user',
-        parts: [{ text: PROMPT + docs.map((d) => `\n--- ${d.label} ---\n${d.text}`).join('\n') }],
+        parts: [{ text: prompt }],
       },
     ],
     generationConfig: {
       responseMimeType: 'application/json',
+      responseSchema: EXTRACTION_RESPONSE_SCHEMA,
       temperature: 0,
     },
   }
 
-  const url = apiKey === 'PROXY' 
-    ? '/api/gemini/generate' 
+  const url = apiKey === 'PROXY'
+    ? '/api/gemini/generate'
     : `${ENDPOINT}?key=${encodeURIComponent(apiKey)}`;
 
   const res = await fetch(url, {
@@ -92,17 +98,49 @@ export async function extractCaseWithGemini(apiKey: string, docs: DocText[]): Pr
   const json = await res.json()
   const text: string | undefined = json?.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) throw new Error('Gemini returned no content — try clearer scans, or use a sample case.')
+  return text
+}
 
-  const parsed = JSON.parse(text)
+function toCaseFile(data: z.infer<typeof extractionSchema>): CaseFile {
   return {
     id: `live-${Date.now()}`,
-    claimant: parsed.claimant ?? 'Unnamed claimant',
-    patientAge: Number(parsed.patientAge) || 0,
-    policy: parsed.policy,
-    episode: parsed.episode,
-    providedDocIds: Array.isArray(parsed.providedDocIds) ? parsed.providedDocIds : [],
-    rejectionLetter: parsed.rejectionLetter ?? undefined,
+    claimant: data.claimant || 'Unnamed claimant',
+    patientAge: data.patientAge,
+    policy: {
+      ...data.policy,
+      roomRent: { type: data.policy.roomRent.type, value: data.policy.roomRent.value ?? undefined },
+    },
+    episode: data.episode,
+    providedDocIds: data.providedDocIds,
+    rejectionLetter: data.rejectionLetter ?? undefined,
   }
+}
+
+export async function extractCaseWithGemini(apiKey: string, docs: DocText[]): Promise<CaseFile> {
+  const basePrompt = PROMPT + docs.map((d) => `\n--- ${d.label} ---\n${d.text}`).join('\n')
+  let prompt = basePrompt
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const text = await requestGemini(apiKey, prompt)
+    let raw: unknown
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      raw = undefined
+    }
+    const parsed = extractionSchema.safeParse(raw)
+    if (parsed.success) return toCaseFile(parsed.data)
+
+    if (attempt === 0) {
+      const issues = parsed.error.issues
+        .map((i) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')
+      prompt = `${basePrompt}\nYour previous response failed schema validation (${issues}). Return corrected JSON only.`
+      continue
+    }
+    throw new Error(UNREADABLE_ERROR)
+  }
+  throw new Error(UNREADABLE_ERROR)
 }
 
 const KEY_STORAGE = 'claimsahayak.geminiKey'
