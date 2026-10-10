@@ -480,7 +480,7 @@ function GrievancePanel({ text }: { text: string | null }) {
       >
         Grievance letter — drafted
       </PanelTitle>
-      <pre className="max-h-96 overflow-auto whitespace-pre-wrap border border-line bg-paper-2/70 p-4 font-mono text-[11.5px] leading-relaxed">
+      <pre tabIndex={0} aria-label="Drafted grievance letter — scrollable" className="max-h-96 overflow-auto whitespace-pre-wrap border border-line bg-paper-2/70 p-4 font-mono text-[11.5px] leading-relaxed">
         {text}
       </pre>
     </div>
@@ -759,16 +759,16 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
   return (
     <div className="mx-auto max-w-shell px-6 py-8">
       <div className="grid gap-8 lg:grid-cols-[280px_1fr_360px]" data-print-hidden>
-        <aside aria-label="Case files and policy terms">
+        <aside aria-label="Case files and policy terms" className="min-w-0">
           <CaseRail current={caseFile} onPick={pick} onFiles={onFiles} busy={busy} uploadNote={uploadNote} />
         </aside>
 
-        <main className="space-y-10">
+        <main className="min-w-0 space-y-10">
           <VerdictPanel c={caseFile} v={verdict} />
           <BillLedger lines={lines} onChange={setLines} onReset={() => setLines(toEditable(baseline.episode.billLines))} dirty={linesDirty} />
         </main>
 
-        <aside aria-label="Rejection desk, letter and summaries" className="space-y-8">
+        <aside aria-label="Rejection desk, letter and summaries" className="min-w-0 space-y-8">
           <RejectionDesk
             letter={letter}
             setLetter={setLetter}

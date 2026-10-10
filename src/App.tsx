@@ -135,7 +135,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-sm" data-print-hidden>
-        <div className="mx-auto flex max-w-shell items-center justify-between px-6 py-3.5">
+        <div className="mx-auto flex max-w-shell flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3.5">
           <button onClick={() => setView('landing')} className="flex items-baseline gap-2.5">
             <span className="font-display text-[22px] font-semibold leading-none">ClaimSahayak</span>
             <span className="hidden font-mono text-[10.5px] uppercase tracking-[0.14em] text-ink-3 sm:inline">

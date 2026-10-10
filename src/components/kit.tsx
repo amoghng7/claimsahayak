@@ -28,7 +28,7 @@ export function NumberedSection({
         {no}
       </div>
       <div>
-        <h3 id={id} className="font-display text-2xl md:text-4xl leading-tight mb-3">{title}</h3>
+        <h2 id={id} className="font-display text-2xl md:text-4xl leading-tight mb-3">{title}</h2>
         <div className="text-ink-3 leading-relaxed max-w-2xl">{children}</div>
       </div>
     </section>
@@ -39,7 +39,7 @@ export function NumberedSection({
 export function PanelTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2 mb-3">
-      <h4 className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">{children}</h4>
+      <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">{children}</h3>
       {right}
     </div>
   )
