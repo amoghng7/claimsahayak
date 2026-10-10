@@ -19,11 +19,15 @@ by a deterministic TypeScript rules engine (`src/engine/rules.ts`). Gemini is us
 turn uploaded documents into structured facts; it never computes money or scores. Keep it
 that way — do not move judgement/math into LLM prompts.
 
-The app itself is stateless: no accounts, no database, no server-side sessions; nothing
-persists beyond the user's `localStorage`. The only server component is a small Node
-**sidecar** (`server/`) running inside the nginx container: it terminates the same-origin
-`/api/gemini/generate` proxy and calls **Vertex AI** with the Cloud Run service account
-(ADC) — no API key material anywhere.
+Persistence is **opt-in and off by default** (Settings → "Save my cases on the
+server"): with consent off, nothing leaves the browser and the anonymous session id is
+never created — the app is exactly as stateless as the demo. With consent on, case
+history lives in Firestore under `sessions/{uuid}/cases` (client-generated UUID in
+localStorage, sent as `X-Session-Id`; no accounts) and uploaded documents go to a GCS
+bucket with a 30-day auto-delete lifecycle rule. The only other server component is the
+Node **sidecar** (`server/`) inside the nginx container: it terminates the same-origin
+`/api/*` routes and calls Google Cloud APIs (Vertex AI, Document AI, Firestore, GCS)
+with the Cloud Run service account (ADC) — no API key material anywhere.
 
 ## Technology stack
 
@@ -86,14 +90,19 @@ src/
     schemas.ts        zod schemas + responseSchema constraining Gemini's output
     pdf.ts            pdf.js text-layer extraction
     ocr.ts            OCR fallback: empty text layer / images → /api/ocr (Document AI)
+    store.ts          consent-gated case store (Firestore/GCS via /api/cases,
+                      /api/uploads; anonymous session id created only after opt-in)
     format.ts         ₹ Indian-format / date helpers (en-IN locale)
-    __tests__/        vitest specs for rules, rejection, grievance, hindi, gemini, ocr
+    __tests__/        vitest specs for rules, rejection, grievance, hindi, gemini,
+                      ocr, store
   data/samples.ts     three synthetic case files (all people/insurers fictional)
   sections/           Landing.tsx, Workbench.tsx (three-column desk UI)
   components/         kit.tsx (Kicker, NumberedSection, PanelTitle), ScoreStamp.tsx
 server/
   index.js            sidecar routes: POST /generate → Vertex AI (ADC),
-                      POST /ocr → Document AI :process (ADC), GET /healthz
+                      POST /ocr → Document AI :process (ADC),
+                      /api/cases + /api/uploads → Firestore/GCS (ADC, session-gated),
+                      GET /healthz
   index.test.js       node --test specs (handler is dependency-injected: token + fetch)
 docker-entrypoint.d/  40-sidecar.sh starts the sidecar before nginx (official entrypoint)
 infra/                gcloud scripts per Phase 06 step (06-1-vertex.sh, …)
@@ -184,11 +193,15 @@ commit. The verification bar for any change:
 
 ## Security considerations
 
-- Never commit API keys or `.env` files. Production Gemini access uses the Cloud Run
-  service account (ADC) — there is no deployed API key to leak or rotate. A local
+- Never commit API keys or `.env` files. Production Google Cloud access uses the Cloud
+  Run service account (ADC) — there is no deployed API key to leak or rotate. A local
   `GEMINI_API_KEY` is dev-only (gitignored `.env`).
 - The browser-direct Gemini path with a user-supplied key is a deliberate demo tradeoff;
   the key stays in the user's localStorage.
+- Server persistence is consent-gated (Settings toggle, default off). Do not weaken
+  this: no server writes without `caseStore.loadConsent() === true`, and the session id
+  must never be created for an opted-out user. Uploaded documents auto-delete after
+  30 days (bucket lifecycle) — keep that rule intact.
 - The sidecar binds 127.0.0.1 only; the only public surface is nginx. Keep it that way —
   new `/api/*` routes go through the nginx proxy block with method restrictions.
 - Keep the nginx CSP/security headers in `nginx.conf.template` intact; expand

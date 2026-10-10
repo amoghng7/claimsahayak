@@ -87,6 +87,9 @@ persistence.
 
 ## Privacy posture
 
-Stateless by design: no accounts, no database, no tracking. Documents are read locally
-in the browser (pdf.js); only extracted text crosses to the proxy, request bodies are
-never logged, and nothing persists server-side.
+Stateless by default: no accounts, no tracking. Documents are read locally in the
+browser (pdf.js); only extracted text crosses to the proxy, request bodies are never
+logged, and nothing persists server-side. Optional case saving (Settings toggle,
+default **off**) stores case history in Firestore under an anonymous session id and
+uploaded documents in Cloud Storage with automatic 30-day deletion — turning the
+toggle off erases the session and returns the app to fully local behavior.

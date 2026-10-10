@@ -18,7 +18,7 @@ flowchart LR
     end
 
     subgraph cloudrun["Cloud Run — asia-south1 (single container, two processes)"]
-        NGINX["nginx\nSPA static + security headers/CSP\nPOST-only proxies /api/gemini/generate, /api/ocr\nrate limit 20 req/min/IP"]
+        NGINX["nginx\nSPA static + security headers/CSP\nPOST-only proxies /api/gemini/generate,\n/api/ocr, /api/cases, /api/uploads\nrate limit 20 req/min/IP"]
         SIDECAR["Node sidecar — server/\nVertex AI + Document AI via ADC\n(service account) — no API key material"]
         NGINX -->|"127.0.0.1:8081"| SIDECAR
     end
@@ -26,6 +26,8 @@ flowchart LR
     subgraph google["Google Cloud"]
         VERTEX["Vertex AI — Gemini\ngemini-3.8-flash, global endpoint, JSON mode\nextraction ONLY — temperature 0,\nzod-validated response schema"]
         DOCAI["Document AI — OCR processor\n(us multi-region)\nscanned/photographed bills only"]
+        FS["Firestore — case history\nsessions/{uuid}/cases\nCONSENT-GATED, default off"]
+        GCS["Cloud Storage — uploaded docs\n30-day auto-delete lifecycle\nCONSENT-GATED, default off"]
         LOGS["Cloud Logging\nper-request audit (IAM-governed)"]
     end
 
@@ -40,6 +42,8 @@ flowchart LR
     PDF -.->|"scanned/photo only:\nPOST /api/ocr"| NGINX
     SIDECAR -->|"ADC access token"| VERTEX
     SIDECAR -->|"ADC access token"| DOCAI
+    SIDECAR -->|"X-Session-Id scoped\n(consent-gated)"| FS
+    SIDECAR -->|"X-Session-Id scoped\n(consent-gated)"| GCS
     DOCAI -->|"OCR text"| SIDECAR
     VERTEX -->|"structured JSON facts"| SIDECAR --> NGINX --> UI
     SIDECAR -.-> LOGS
@@ -78,6 +82,8 @@ flowchart LR
 
 ## State
 
-Stateless. No accounts, no database, no server-side sessions; nothing persists beyond
-the user's own localStorage (API-key override, UI prefs). Persistence, if ever added,
-is Phase 06 step 6.4 and must be consent-gated.
+Stateless by default: no accounts, no tracking; nothing persists beyond the user's own
+localStorage (API-key override, UI prefs). With the explicit Settings consent toggle
+ON, case history is stored in Firestore under an anonymous client-generated session id
+and uploaded documents in Cloud Storage with a 30-day auto-delete rule; turning it off
+erases the session and restores fully local behavior.
