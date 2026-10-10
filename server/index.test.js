@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { createHandler, vertexUrl } from './index.js'
+import { createHandler, docaiUrl, vertexUrl } from './index.js'
 
 const FAKE_BODY = JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
 
@@ -121,5 +121,99 @@ describe('routing', () => {
     const res = mockRes()
     await handler(req('POST', '/nope'), res)
     assert.equal(res.statusCode, 404)
+  })
+})
+
+/* ---------- POST /ocr (Phase 06 step 6.2 — Document AI) ---------- */
+
+describe('docaiUrl', () => {
+  it('builds the processor :process URL from config', () => {
+    const url = docaiUrl({ project: 'p', location: 'us', processor: 'abc123' })
+    assert.equal(url, 'https://us-documentai.googleapis.com/v1/projects/p/locations/us/processors/abc123:process')
+  })
+})
+
+describe('POST /ocr', () => {
+  const docai = { project: 'p', location: 'us', processor: 'abc123' }
+  const genConfig = { project: 'p', location: 'global', model: 'm' }
+
+  it('sends the raw document to Document AI and returns the extracted text', async () => {
+    const calls = []
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 'token-ocr',
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, opts })
+        return { status: 200, text: async () => JSON.stringify({ document: { text: 'HOSPITAL BILL\nTotal 435000' } }) }
+      },
+    })
+    const res = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'YmFzZTY0', mimeType: 'application/pdf' })), res)
+    assert.equal(res.statusCode, 200)
+    assert.deepEqual(JSON.parse(res.body), { text: 'HOSPITAL BILL\nTotal 435000' })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].url, docaiUrl(docai))
+    assert.equal(calls[0].opts.headers.Authorization, 'Bearer token-ocr')
+    const sent = JSON.parse(calls[0].opts.body)
+    assert.deepEqual(sent, { rawDocument: { content: 'YmFzZTY0', mimeType: 'application/pdf' } })
+  })
+
+  it('answers 400 JSON when content is missing', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ mimeType: 'application/pdf' })), res)
+    assert.equal(res.statusCode, 400)
+    assert.match(res.body, /bad_request/)
+  })
+
+  it('answers 503 JSON when the processor is not configured', async () => {
+    const handler = createHandler({
+      config: genConfig,
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'eA==', mimeType: 'application/pdf' })), res)
+    assert.equal(res.statusCode, 503)
+    assert.match(res.body, /not_configured/)
+  })
+
+  it('passes through an upstream error status and body', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 400, text: async () => '{"error":{"message":"bad document"}}' }),
+    })
+    const res = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'eA==', mimeType: 'application/pdf' })), res)
+    assert.equal(res.statusCode, 400)
+    assert.equal(res.body, '{"error":{"message":"bad document"}}')
+  })
+
+  it('answers 502 JSON when the upstream call throws', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 't',
+      fetchImpl: async () => { throw new Error('down') },
+    })
+    const res = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'eA==', mimeType: 'application/pdf' })), res)
+    assert.equal(res.statusCode, 502)
+    assert.match(res.body, /upstream_unavailable/)
+  })
+
+  it('GET /ocr is 405 JSON', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(req('GET', '/ocr'), res)
+    assert.equal(res.statusCode, 405)
   })
 })
