@@ -12,6 +12,13 @@ export const roomRentSchema = z.object({
   value: z.number().nonnegative().nullable(),
 })
 
+export const subLimitSchema = z.object({
+  name: z.string(),
+  match: z.array(z.string()),
+  type: z.enum(['fixed', 'percent_si', 'percent_claim']),
+  value: z.number().nonnegative(),
+})
+
 export const policySchema = z.object({
   insurer: z.string(),
   product: z.string(),
@@ -26,6 +33,7 @@ export const policySchema = z.object({
   specificWaitingYears: z.number().nonnegative(),
   specificDiseases: z.array(z.string()),
   exclusions: z.array(z.string()),
+  subLimits: z.array(subLimitSchema),
 })
 
 export const billLineSchema = z.object({
@@ -95,11 +103,24 @@ export const EXTRACTION_RESPONSE_SCHEMA = {
         specificWaitingYears: { type: 'NUMBER' },
         specificDiseases: { type: 'ARRAY', items: { type: 'STRING' } },
         exclusions: { type: 'ARRAY', items: { type: 'STRING' } },
+        subLimits: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              name: { type: 'STRING' },
+              match: { type: 'ARRAY', items: { type: 'STRING' } },
+              type: { type: 'STRING', enum: ['fixed', 'percent_si', 'percent_claim'] },
+              value: { type: 'NUMBER' },
+            },
+            required: ['name', 'match', 'type', 'value'],
+          },
+        },
       },
       required: [
         'insurer', 'product', 'policyNo', 'inceptionDate', 'sumInsured', 'roomRent',
         'copayPct', 'initialWaitingDays', 'pedWaitMonths', 'pedsDeclared', 'specificWaitingYears', 'specificDiseases',
-        'exclusions',
+        'exclusions', 'subLimits',
       ],
     },
     episode: {

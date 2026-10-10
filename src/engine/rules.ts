@@ -61,6 +61,16 @@ export interface RoomRentAnalysis {
 }
 
 /**
+ * IRDAI convention: ICU / intensive-care / ventilator charges are not subject
+ * to the room-rent sub-limit or the proportionate deduction that follows it.
+ */
+export const ICU_PATTERN = /icu|intensive care|ventilator/i
+
+export function isIcuLine(l: BillLine): boolean {
+  return ICU_PATTERN.test(l.head)
+}
+
+/**
  * The trap: pick a room above your sub-limit and the insurer doesn't just
  * cut the room rent — it scales down every charge linked to room category
  * by the same ratio. Deterministic arithmetic; no model involved.
@@ -76,9 +86,15 @@ export function roomRentAnalysis(
   const allowed = allowedRoomRent(policy)
   if (allowed === null || ep.roomRentPerDay <= allowed) return null
   const ratio = allowed / ep.roomRentPerDay
-  const roomCut = (ep.roomRentPerDay - allowed) * ep.roomDays
+  const roomLines = ep.billLines.filter((l) => l.isRoomRent)
+  const roomCut =
+    roomLines.length > 0
+      ? roomLines
+          .filter((l) => !isIcuLine(l) && !omit?.(l))
+          .reduce((sum, l) => sum + l.amount * (1 - ratio), 0)
+      : (ep.roomRentPerDay - allowed) * ep.roomDays
   const proportionalCut = ep.billLines
-    .filter((l) => l.roomLinked && !l.isRoomRent && !omit?.(l))
+    .filter((l) => l.roomLinked && !l.isRoomRent && !isIcuLine(l) && !omit?.(l))
     .reduce((sum, l) => sum + l.amount * (1 - ratio), 0)
   return { allowed, actual: ep.roomRentPerDay, ratio, roomCut, proportionalCut }
 }
@@ -239,12 +255,18 @@ export function waitingPeriodCheck(c: CaseFile): WaitingFlag[] {
 /* Payable waterfall                                                   */
 /* ------------------------------------------------------------------ */
 
+export interface SubLimitCut {
+  label: string
+  amount: number
+}
+
 export interface PayableEstimate {
   total: number
   roomCut: number
   proportionalCut: number
   exclusionCut: number
   pedCut: number
+  subLimitCuts: SubLimitCut[]
   nonPayableCut: number
   copayCut: number
   expected: number
@@ -260,10 +282,30 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
   const proportionalCut = rr?.proportionalCut ?? 0
   const exclusionCut = excl.excludedAmount
   const pedCut = ped.excludedAmount
+
+  // Named sub-limits cap the (post-proportional) sum of their matched lines.
+  const subLimitCuts: SubLimitCut[] = []
+  for (const sl of c.policy.subLimits) {
+    const limit =
+      sl.type === 'fixed'
+        ? sl.value
+        : sl.type === 'percent_si'
+          ? (sl.value / 100) * c.policy.sumInsured
+          : (sl.value / 100) * ep.totalBill
+    const effective = ep.billLines
+      .filter((l) => !l.nonPayable && !excluded.has(l) && sl.match.some((k) => containsKeyword(l.head, k)))
+      .reduce((s, l) => s + l.amount * (rr && l.roomLinked && !isIcuLine(l) ? rr.ratio : 1), 0)
+    const cap = Math.max(0, effective - limit)
+    if (cap > 0) {
+      subLimitCuts.push({ label: `${sl.name} cap: ₹${Math.round(limit).toLocaleString('en-IN')} applied`, amount: cap })
+    }
+  }
+  const subLimitCut = subLimitCuts.reduce((s, c) => s + c.amount, 0)
+
   const nonPayableCut = ep.billLines
     .filter((l) => l.nonPayable && !excluded.has(l))
     .reduce((s, l) => s + l.amount, 0)
-  const admissible = Math.max(0, ep.totalBill - roomCut - proportionalCut - exclusionCut - pedCut - nonPayableCut)
+  const admissible = Math.max(0, ep.totalBill - roomCut - proportionalCut - exclusionCut - pedCut - subLimitCut - nonPayableCut)
   const copayCut = (admissible * c.policy.copayPct) / 100
   return {
     total: ep.totalBill,
@@ -271,6 +313,7 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
     proportionalCut,
     exclusionCut,
     pedCut,
+    subLimitCuts,
     nonPayableCut,
     copayCut,
     expected: Math.max(0, admissible - copayCut),

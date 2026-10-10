@@ -30,6 +30,7 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
     specificWaitingYears: 2,
     specificDiseases: ['Cataract'],
     exclusions: [],
+    subLimits: [],
     ...overrides,
   }
 }
@@ -106,11 +107,13 @@ describe('roomRentAnalysis — Ramesh Iyer proportional-deduction trap', () => {
 describe('estimatePayable — waterfall ordering', () => {
   it('room cut and proportional cut precede non-payables (Ramesh)', () => {
     const p = estimatePayable(ramesh)
+    expect(p.total).toBe(435000)
     expect(p.roomCut).toBe(12000)
+    // ₹1,70,000 room-linked × (1 − 0.625); the ₹15,000 ICU line is exempt
     expect(p.proportionalCut).toBe(63750)
     expect(p.nonPayableCut).toBe(9500)
-    // 420000 − 12000 − 63750 − 9500 = 334750
-    expect(p.expected).toBe(334750)
+    // 435000 − 12000 − 63750 − 9500 = 349750
+    expect(p.expected).toBe(349750)
   })
 
   it('co-pay applies last, on the admissible amount after non-payables (Arvind)', () => {
@@ -315,6 +318,91 @@ describe('pedWaitingCheck — PED waiting-period scoring (AUD-12)', () => {
   })
 })
 
+describe('sub-limits beyond room rent + ICU nuance (AUD-13)', () => {
+  it('a fixed sub-limit caps the sum of matched bill lines, with its own waterfall row', () => {
+    const c = makeCase({
+      policy: makePolicy({
+        subLimits: [{ name: 'Cataract (per eye)', match: ['cataract'], type: 'fixed', value: 40000 }],
+      }),
+    })
+    c.episode.diagnosis = 'Cataract (right eye)'
+    c.episode.procedure = 'Phacoemulsification with IOL'
+    c.episode.billLines = [
+      { head: 'Room & nursing charges', amount: 12000, roomLinked: false, isRoomRent: true },
+      { head: 'Cataract surgery package', amount: 45000, roomLinked: false },
+      { head: 'Cataract lens implant', amount: 10000, roomLinked: false },
+    ]
+    c.episode.totalBill = 67000
+    const p = estimatePayable(c)
+    expect(p.subLimitCuts).toHaveLength(1)
+    expect(p.subLimitCuts[0].amount).toBe(15000)
+    expect(p.subLimitCuts[0].label).toContain('Cataract')
+    expect(p.expected).toBe(52000)
+  })
+
+  it('a percent_si sub-limit resolves against the sum insured', () => {
+    const c = makeCase({
+      policy: makePolicy({
+        subLimits: [{ name: 'Modern treatments', match: ['robotic'], type: 'percent_si', value: 10 }],
+      }),
+    })
+    c.episode.billLines = [
+      { head: 'Room & nursing charges', amount: 12000, roomLinked: false, isRoomRent: true },
+      { head: 'Robotic surgery charges', amount: 80000, roomLinked: false },
+    ]
+    c.episode.totalBill = 92000
+    const p = estimatePayable(c)
+    // 10% of ₹5,00,000 SI = ₹50,000 limit; matched ₹80,000 → cap ₹30,000
+    expect(p.subLimitCuts[0].amount).toBe(30000)
+    expect(p.expected).toBe(62000)
+  })
+
+  it('no cap row when the matched spend is within the limit', () => {
+    const c = makeCase({
+      policy: makePolicy({
+        subLimits: [{ name: 'Cataract (per eye)', match: ['cataract'], type: 'fixed', value: 40000 }],
+      }),
+    })
+    const p = estimatePayable(c)
+    expect(p.subLimitCuts).toHaveLength(0)
+    expect(p.expected).toBe(20000)
+  })
+
+  it('ICU lines are never proportionally reduced; non-ICU room-linked lines still are', () => {
+    const c = makeCase({ policy: makePolicy({ roomRent: { type: 'daily_cap', value: 2000 } }) })
+    c.episode.roomRentPerDay = 4000
+    c.episode.roomDays = 3
+    c.episode.billLines = [
+      { head: 'Room & nursing charges', amount: 12000, roomLinked: false, isRoomRent: true },
+      { head: 'ICU & ventilator charges', amount: 30000, roomLinked: true },
+      { head: 'Surgeon fees', amount: 20000, roomLinked: true },
+    ]
+    c.episode.totalBill = 62000
+    const rr = roomRentAnalysis(c.policy, c.episode)!
+    expect(rr.ratio).toBe(0.5)
+    // room cut applies to the non-ICU room line only: 12000 × (1 − 0.5)
+    expect(rr.roomCut).toBe(6000)
+    // proportional cut on surgeon fees only — the ICU line is exempt
+    expect(rr.proportionalCut).toBe(10000)
+    const p = estimatePayable(c)
+    expect(p.expected).toBe(62000 - 6000 - 10000)
+  })
+
+  it('an ICU room-rent line is exempt from the room cap itself', () => {
+    const c = makeCase({ policy: makePolicy({ roomRent: { type: 'daily_cap', value: 2000 } }) })
+    c.episode.roomRentPerDay = 4000
+    c.episode.roomDays = 3
+    c.episode.billLines = [
+      { head: 'ICU (intensive care) room rent', amount: 12000, roomLinked: false, isRoomRent: true },
+      { head: 'Surgeon fees', amount: 20000, roomLinked: true },
+    ]
+    c.episode.totalBill = 32000
+    const rr = roomRentAnalysis(c.policy, c.episode)!
+    expect(rr.roomCut).toBe(0)
+    expect(rr.proportionalCut).toBe(10000)
+  })
+})
+
 describe('buildVerdict — score bands and stacking', () => {
   it('score 75 is the strong/fair boundary (strong)', () => {
     // 100 − 12 (1 mandatory doc) − 8 (2 optional docs) − 5 (co-pay) = 75
@@ -400,11 +488,11 @@ describe('analyzeRejection — pattern matching', () => {
 })
 
 describe('bundled sample cases — documented results', () => {
-  it('Ramesh Iyer: score 53 (fair), expected payout ₹3,34,750', () => {
+  it('Ramesh Iyer: score 53 (fair), expected payout ₹3,49,750', () => {
     const v = buildVerdict(ramesh)
     expect(v.score).toBe(53)
     expect(v.band).toBe('fair')
-    expect(v.payable.expected).toBe(334750)
+    expect(v.payable.expected).toBe(349750)
   })
 
   it('Meera Kulkarni: score 96 (strong), expected payout ₹1,80,500', () => {

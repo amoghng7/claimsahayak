@@ -160,6 +160,8 @@ function Waterfall({ v }: { v: Verdict }) {
     ['Proportional cut on linked charges', -p.proportionalCut, 'var(--crimson)', true],
   ]
   if (p.exclusionCut > 0) rows.push(['Permanent-exclusion cut', -p.exclusionCut, 'var(--crimson)', true])
+  if (p.pedCut > 0) rows.push(['PED waiting-period exclusion', -p.pedCut, 'var(--crimson)', true])
+  for (const cut of p.subLimitCuts) rows.push([cut.label, -cut.amount, 'var(--crimson)', true])
   rows.push(
     ['Non-payable consumables', -p.nonPayableCut, 'var(--brick)', true],
     ['Co-payment', -p.copayCut, 'var(--brick)', true],

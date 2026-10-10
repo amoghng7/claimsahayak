@@ -31,6 +31,7 @@ export const SAMPLE_CASES: CaseFile[] = [
         'Refractive error correction',
         'Infertility treatment',
       ],
+      subLimits: [{ name: 'Cataract (per eye)', match: ['cataract'], type: 'fixed', value: 40000 }],
     },
     episode: {
       hospital: 'Sagar Multispeciality Hospital',
@@ -45,6 +46,7 @@ export const SAMPLE_CASES: CaseFile[] = [
       roomDays: 4,
       billLines: [
         { head: 'Room & nursing charges', amount: 32000, roomLinked: false, isRoomRent: true },
+        { head: 'ICU charges (post-op, 1 day)', amount: 15000, roomLinked: true },
         { head: 'Surgeon & consultant fees', amount: 85000, roomLinked: true },
         { head: 'Operation theatre charges', amount: 60000, roomLinked: true },
         { head: 'Anaesthesia charges', amount: 25000, roomLinked: true },
@@ -54,7 +56,7 @@ export const SAMPLE_CASES: CaseFile[] = [
         { head: 'Laparoscopic equipment & sundries', amount: 68000, roomLinked: false },
         { head: 'Other services', amount: 70000, roomLinked: false },
       ],
-      totalBill: 420000,
+      totalBill: 435000,
     },
     providedDocIds: ['claim-form', 'discharge-summary', 'final-bill', 'prescriptions', 'policy-copy', 'kyc'],
   },
@@ -80,6 +82,7 @@ export const SAMPLE_CASES: CaseFile[] = [
         'Dental treatment unless accidental',
         'Refractive error correction',
       ],
+      subLimits: [],
     },
     episode: {
       hospital: 'Deenanath City Hospital',
@@ -138,6 +141,7 @@ export const SAMPLE_CASES: CaseFile[] = [
         'Dental treatment unless accidental',
         'Domiciliary treatment',
       ],
+      subLimits: [],
     },
     episode: {
       hospital: 'Mercy General Hospital',

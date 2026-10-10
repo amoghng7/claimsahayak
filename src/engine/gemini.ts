@@ -30,7 +30,8 @@ From the document texts below, produce ONE JSON object with EXACTLY this shape
     "pedWaitMonths": number | null, "pedsDeclared": string[],
     "specificWaitingYears": number,
     "specificDiseases": string[],
-    "exclusions": string[]
+    "exclusions": string[],
+    "subLimits": [{ "name": string, "match": string[], "type": "fixed" | "percent_si" | "percent_claim", "value": number }]
   },
   "episode": {
     "hospital": string, "city": string,
@@ -50,6 +51,7 @@ Rules:
 - roomLinked = true for heads that insurers tie to room category (surgeon/ consultant fees, nursing, OT charges); isRoomRent = true for the room & nursing rent line itself; nonPayable = true for consumables (gloves, masks, syringes, etc.).
 - exclusions = the policy schedule's permanent exclusions as short labels (e.g. "Cosmetic surgery", "Dental treatment").
 - pedWaitMonths = the PED waiting period in months (null if the document does not state one); pedsDeclared = pre-existing diseases declared on the proposal form.
+- subLimits = named caps beyond room rent (e.g. "Cataract ₹40,000 per eye" → { name: "Cataract (per eye)", match: ["cataract"], type: "fixed", value: 40000 }). match holds lowercase keywords that would appear in bill-line heads; percent_si value is the percent of sum insured, percent_claim the percent of the claimed amount. Empty array if none stated.
 - All money in INR numbers, dates ISO.
 
 DOCUMENTS:

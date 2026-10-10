@@ -6,6 +6,16 @@ export interface RoomRentLimit {
   value?: number
 }
 
+/** A named sub-limit: caps the sum of bill lines whose heads match `match`. */
+export interface SubLimit {
+  name: string
+  /** keywords matched against bill-line heads (word-boundary, case-insensitive) */
+  match: string[]
+  /** fixed ₹ | % of sum insured | % of the claimed amount */
+  type: 'fixed' | 'percent_si' | 'percent_claim'
+  value: number
+}
+
 export interface Policy {
   insurer: string
   product: string
@@ -23,6 +33,8 @@ export interface Policy {
   specificDiseases: string[]
   /** permanent exclusions as printed in the policy schedule */
   exclusions: string[]
+  /** named sub-limits beyond room rent (cataract caps, modern treatments…) */
+  subLimits: SubLimit[]
 }
 
 export interface BillLine {
