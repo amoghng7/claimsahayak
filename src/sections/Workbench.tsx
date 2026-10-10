@@ -390,13 +390,13 @@ function RejectionDesk({
             type="date"
             value={rejectionDate}
             onChange={(e) => setRejectionDate(e.target.value)}
-            className="flex-1 border border-line bg-paper px-2.5 py-1.5 font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-brick"
+            className="flex-1 min-h-11 border border-line bg-paper px-2.5 py-2 font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-brick"
           />
         </div>
         <button
           onClick={onAnalyze}
           disabled={!letter.trim() || aiBusy}
-          className="mt-2 w-full rounded-full bg-ink py-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition-transform duration-150 hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0"
+          className="mt-2 min-h-11 w-full rounded-full bg-ink py-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition-transform duration-150 hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0"
         >
           {aiBusy ? 'Reading with AI…' : 'Classify the rejection'}
         </button>
@@ -464,13 +464,13 @@ function GrievancePanel({ text }: { text: string | null }) {
                   setTimeout(() => setCopied(false), 1600)
                 })
               }}
-              className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+              className="min-h-11 inline-flex items-center font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
             >
               {copied ? 'copied ✓' : 'copy letter'}
             </button>
             <button
               onClick={() => window.print()}
-              className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+              className="min-h-11 inline-flex items-center font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
             >
               Print / Save as PDF
             </button>
@@ -549,7 +549,7 @@ function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick: (
       type="button"
       onClick={onClick}
       aria-pressed={on}
-      className={`border px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider transition-colors duration-150 ${
+      className={`min-h-11 inline-flex items-center border px-3 font-mono text-[9.5px] uppercase tracking-wider transition-colors duration-150 ${
         on ? 'border-ink bg-paper-2 text-ink' : 'border-line text-ink-3 hover:bg-paper-2/60'
       }`}
     >
@@ -581,7 +581,7 @@ function BillLedger({
             <button
               type="button"
               onClick={onReset}
-              className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+              className="min-h-11 inline-flex items-center font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
             >
               Reset to extracted values
             </button>
@@ -621,7 +621,7 @@ function BillLedger({
               type="button"
               aria-label="Delete line"
               onClick={() => onChange(lines.filter((_, j) => j !== i))}
-              className="px-1.5 font-mono text-[13px] text-ink-3 transition-colors duration-150 hover:text-crimson"
+              className="min-h-11 min-w-11 inline-flex items-center justify-center font-mono text-[13px] text-ink-3 transition-colors duration-150 hover:text-crimson"
             >
               ×
             </button>
@@ -631,7 +631,7 @@ function BillLedger({
           <button
             type="button"
             onClick={() => onChange([...lines, { head: 'New charge', amount: 0, roomLinked: false, edited: true }])}
-            className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+            className="min-h-11 inline-flex items-center font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
           >
             + Add line
           </button>
@@ -785,7 +785,7 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
             <PanelTitle>Export</PanelTitle>
             <button
               onClick={exportJson}
-              className="w-full rounded-full border border-ink/40 py-2.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
+              className="min-h-11 w-full rounded-full border border-ink/40 py-2.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
             >
               Download case JSON
             </button>

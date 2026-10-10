@@ -113,7 +113,7 @@ export default function App() {
           <nav className="flex items-center gap-2.5">
             <button
               onClick={() => setSettingsOpen(true)}
-              className="flex items-center gap-2 rounded-full border border-ink/40 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
+              className="flex min-h-11 items-center gap-2 rounded-full border border-ink/40 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
             >
               <span
                 className="h-1.5 w-1.5 rounded-full"
@@ -124,14 +124,14 @@ export default function App() {
             {view === 'landing' ? (
               <button
                 onClick={() => openDesk()}
-                className="rounded-full bg-chart px-5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-150 hover:-translate-y-0.5"
+                className="inline-flex min-h-11 items-center rounded-full bg-chart px-5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-150 hover:-translate-y-0.5"
               >
                 Open the desk →
               </button>
             ) : (
               <button
                 onClick={() => setView('landing')}
-                className="rounded-full border border-ink/40 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
+                className="inline-flex min-h-11 items-center rounded-full border border-ink/40 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
               >
                 ← Overview
               </button>
