@@ -149,6 +149,13 @@ describe('extractCaseWithGemini — proxy error mapping', () => {
     )
   })
 
+  it('402 maps to a credits-exhausted message', async () => {
+    mockFetchSequence(errorResponse(402))
+    await expect(extractCaseWithGemini('PROXY', DOCS)).rejects.toThrow(
+      'The managed key is out of Gemini credits',
+    )
+  })
+
   it('502 maps to a service-unavailable message', async () => {
     mockFetchSequence(errorResponse(502))
     await expect(extractCaseWithGemini('PROXY', DOCS)).rejects.toThrow(

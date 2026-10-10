@@ -93,6 +93,9 @@ async function requestGemini(apiKey: string, prompt: string): Promise<string> {
     if (res.status === 400 || res.status === 403) {
       throw new Error('Gemini rejected the request — check the API key. Demo mode still works without one.')
     }
+    if (res.status === 402) {
+      throw new Error('The managed key is out of Gemini credits — add credits in AI Studio, or use your own key in Settings.')
+    }
     if (res.status === 429) {
       throw new Error('Too many requests — wait a minute and retry.')
     }
