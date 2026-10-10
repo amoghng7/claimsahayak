@@ -64,7 +64,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
               </div>
             </div>
             <div className="border-t border-line pt-3 font-mono text-[11px] text-ink-3">
-              R. Iyer · ₹4,20,000 bill · Pune
+              R. Iyer · ₹4,35,000 bill · Pune
             </div>
           </div>
         </div>

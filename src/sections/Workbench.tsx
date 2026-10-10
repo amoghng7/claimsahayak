@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import type { CaseFile } from '../engine/types'
+import type { BillLine, CaseFile } from '../engine/types'
 import {
   STANDARD_DOCS,
   analyzeRejection,
@@ -419,18 +419,162 @@ function HindiPanel({ lines }: { lines: string[] }) {
   )
 }
 
+/* ---------- bill-line editor ---------- */
+
+/** A bill line plus the UI-only "user touched this row" marker. */
+type EditableLine = BillLine & { edited?: boolean }
+
+function toEditable(lines: BillLine[]): EditableLine[] {
+  return lines.map((l) => ({ ...l }))
+}
+
+function stripEdited(lines: EditableLine[]): BillLine[] {
+  return lines.map((l) => ({
+    head: l.head,
+    amount: l.amount,
+    roomLinked: l.roomLinked,
+    isRoomRent: l.isRoomRent,
+    nonPayable: l.nonPayable,
+  }))
+}
+
+/** Input guard: amounts are always finite, non-negative numbers. */
+function clampAmount(raw: string): number {
+  const n = Number(raw)
+  return Number.isFinite(n) ? Math.max(0, n) : 0
+}
+
+function Toggle({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={`border px-2 py-1 font-mono text-[9.5px] uppercase tracking-wider transition-colors duration-150 ${
+        on ? 'border-ink bg-paper-2 text-ink' : 'border-line text-ink-3 hover:bg-paper-2/60'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function BillLedger({
+  lines,
+  onChange,
+  onReset,
+  dirty,
+}: {
+  lines: EditableLine[]
+  onChange: (lines: EditableLine[]) => void
+  onReset: () => void
+  dirty: boolean
+}) {
+  const total = lines.reduce((s, l) => s + l.amount, 0)
+  const update = (i: number, patch: Partial<EditableLine>) =>
+    onChange(lines.map((l, j) => (j === i ? { ...l, ...patch, edited: true } : l)))
+
+  return (
+    <div>
+      <PanelTitle
+        right={
+          dirty ? (
+            <button
+              type="button"
+              onClick={onReset}
+              className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+            >
+              Reset to extracted values
+            </button>
+          ) : (
+            <span className="font-mono text-[10px] text-ink-3">{lines.length} lines</span>
+          )
+        }
+      >
+        Bill lines — check the extraction
+      </PanelTitle>
+      <div className="border border-line">
+        {lines.map((l, i) => (
+          <div
+            key={i}
+            className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-line-faint last:border-0"
+          >
+            <input
+              value={l.head}
+              aria-label="Line item"
+              onChange={(e) => update(i, { head: e.target.value })}
+              className="min-w-40 flex-1 bg-transparent text-[13px] focus:outline-none focus:ring-1 focus:ring-brick"
+            />
+            {l.edited && (
+              <span className="font-mono text-[9px] uppercase tracking-wider text-brick">edited</span>
+            )}
+            <Toggle on={l.roomLinked} label="room-linked" onClick={() => update(i, { roomLinked: !l.roomLinked })} />
+            <Toggle on={!!l.nonPayable} label="non-payable" onClick={() => update(i, { nonPayable: !l.nonPayable })} />
+            <input
+              type="number"
+              min={0}
+              value={l.amount}
+              aria-label="Amount"
+              onChange={(e) => update(i, { amount: clampAmount(e.target.value) })}
+              className="w-28 bg-transparent text-right font-mono text-[12.5px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brick"
+            />
+            <button
+              type="button"
+              aria-label="Delete line"
+              onClick={() => onChange(lines.filter((_, j) => j !== i))}
+              className="px-1.5 font-mono text-[13px] text-ink-3 transition-colors duration-150 hover:text-crimson"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <div className="flex items-center justify-between gap-4 border-t border-line bg-paper-2/60 px-3 py-2.5">
+          <button
+            type="button"
+            onClick={() => onChange([...lines, { head: 'New charge', amount: 0, roomLinked: false, edited: true }])}
+            className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+          >
+            + Add line
+          </button>
+          <span className="font-mono text-[12.5px] font-semibold tabular-nums">Total {formatINR(total)}</span>
+        </div>
+      </div>
+      <p className="mt-2 font-mono text-[10.5px] text-ink-3">
+        Corrections recompute the verdict instantly through the same engine. The total always equals the sum of the rows above.
+      </p>
+    </div>
+  )
+}
+
 /* ---------- the desk ---------- */
 
 export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
-  const [caseFile, setCaseFile] = useState<CaseFile>(
+  const [baseline, setBaseline] = useState<CaseFile>(
     () => SAMPLE_CASES.find((c) => c.id === initialCaseId) ?? SAMPLE_CASES[0],
   )
-  const [letter, setLetter] = useState(caseFile.rejectionLetter ?? '')
+  const [lines, setLines] = useState<EditableLine[]>(() => toEditable(baseline.episode.billLines))
+  const [letter, setLetter] = useState(baseline.rejectionLetter ?? '')
   const [analysis, setAnalysis] = useState<RejectionVerdict | null>(
-    caseFile.rejectionLetter ? analyzeRejection(caseFile, caseFile.rejectionLetter) : null,
+    baseline.rejectionLetter ? analyzeRejection(baseline, baseline.rejectionLetter) : null,
   )
   const [busy, setBusy] = useState(false)
   const [uploadNote, setUploadNote] = useState<string | null>(null)
+
+  // The editor owns bill lines; everything downstream (verdict, Hindi summary,
+  // grievance, export) derives from this single recomputed CaseFile.
+  const caseFile = useMemo<CaseFile>(
+    () => ({
+      ...baseline,
+      episode: {
+        ...baseline.episode,
+        billLines: stripEdited(lines),
+        totalBill: lines.reduce((s, l) => s + l.amount, 0),
+      },
+    }),
+    [baseline, lines],
+  )
+  const linesDirty =
+    lines.some((l) => l.edited) || lines.length !== baseline.episode.billLines.length
 
   const verdict = useMemo(() => buildVerdict(caseFile), [caseFile])
   const hindi = useMemo(() => hindiSummary(caseFile, verdict), [caseFile, verdict])
@@ -440,7 +584,8 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
   )
 
   const pick = (c: CaseFile) => {
-    setCaseFile(c)
+    setBaseline(c)
+    setLines(toEditable(c.episode.billLines))
     setLetter(c.rejectionLetter ?? '')
     setAnalysis(c.rejectionLetter ? analyzeRejection(c, c.rejectionLetter) : null)
   }
@@ -482,8 +627,9 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
           <CaseRail current={caseFile} onPick={pick} onFiles={onFiles} busy={busy} uploadNote={uploadNote} />
         </aside>
 
-        <main>
+        <main className="space-y-10">
           <VerdictPanel c={caseFile} v={verdict} />
+          <BillLedger lines={lines} onChange={setLines} onReset={() => setLines(toEditable(baseline.episode.billLines))} dirty={linesDirty} />
         </main>
 
         <aside className="space-y-8">

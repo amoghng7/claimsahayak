@@ -487,6 +487,56 @@ describe('analyzeRejection — pattern matching', () => {
   })
 })
 
+describe('line-item editor recompute path (AUD-14)', () => {
+  it('an edited amount flows through the same engine and changes the payout', () => {
+    // Meera: Medicines & pharmacy ₹21,000 → ₹31,000; totalBill ₹1,85,000 → ₹1,95,000
+    const edited: CaseFile = {
+      ...meera,
+      episode: {
+        ...meera.episode,
+        billLines: meera.episode.billLines.map((l) =>
+          l.head === 'Medicines & pharmacy' ? { ...l, amount: 31000 } : l,
+        ),
+        totalBill: 195000,
+      },
+    }
+    const p = estimatePayable(edited)
+    expect(p.total).toBe(195000)
+    // 195000 − 4500 non-payables = 190500
+    expect(p.expected).toBe(190500)
+  })
+
+  it('toggling a line non-payable deducts it in full', () => {
+    // Meera: Investigations & imaging ₹23,000 flagged non-payable
+    const edited: CaseFile = {
+      ...meera,
+      episode: {
+        ...meera.episode,
+        billLines: meera.episode.billLines.map((l) =>
+          l.head === 'Investigations & imaging' ? { ...l, nonPayable: true } : l,
+        ),
+      },
+    }
+    const p = estimatePayable(edited)
+    // 185000 − (4500 + 23000) = 157500
+    expect(p.nonPayableCut).toBe(27500)
+    expect(p.expected).toBe(157500)
+  })
+
+  it('deleting a line and reconciling the total drops the payout by that amount', () => {
+    // Meera: drop Other services ₹30,000 → totalBill ₹1,55,000
+    const edited: CaseFile = {
+      ...meera,
+      episode: {
+        ...meera.episode,
+        billLines: meera.episode.billLines.filter((l) => l.head !== 'Other services'),
+        totalBill: 155000,
+      },
+    }
+    expect(estimatePayable(edited).expected).toBe(150500)
+  })
+})
+
 describe('bundled sample cases — documented results', () => {
   it('Ramesh Iyer: score 53 (fair), expected payout ₹3,49,750', () => {
     const v = buildVerdict(ramesh)
