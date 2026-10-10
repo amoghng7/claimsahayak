@@ -107,8 +107,11 @@ Module conventions:
 Gemini key resolution (`loadGeminiKey`): localStorage key `claimsahayak.geminiKey`,
 defaulting to the sentinel `'PROXY'`, which routes requests to the same-origin path
 `/api/gemini/generate` (see Deployment). A user-entered key is sent browser-direct to
-`generativelanguage.googleapis.com`. For local dev, `VITE_GEMINI_API_KEY` may be set in a
-local `.env` (see `.env.example`) — never commit a real key; `.env*` is gitignored.
+`generativelanguage.googleapis.com`. For local dev, the vite dev server runs the same
+proxy as middleware (`configureServer` in `vite.config.ts`), keyed by `GEMINI_API_KEY`
+in a local `.env` (see `.env.example`); without it the middleware answers HTTP 428
+`{"error":"no_dev_key"}` and the app shows a friendly prompt. Never commit a real key;
+`.env*` is gitignored.
 
 ## Deployment
 
@@ -117,8 +120,10 @@ local `.env` (see `.env.example`) — never commit a real key; `.env*` is gitign
 - `nginx.conf.template` (envsubst'd into the nginx config): SPA fallback, security
   headers + CSP, static-asset caching, and a POST-only reverse proxy at
   `/api/gemini/generate` → Gemini's `generateContent` endpoint with the key injected from
-  the `GEMINI_API_KEY` env var. The nginx CSP is tight (`script-src 'self'`, Google Fonts
-  only for style/font) — if you add external resources, update the CSP.
+  the `GEMINI_API_KEY` env var. The proxy is rate-limited (20 req/min per IP, burst 10,
+  4 MB body cap, JSON 429/502). The nginx CSP is tight (`script-src 'self'`, Google Fonts
+  for style/font, `connect-src 'self'` plus `generativelanguage.googleapis.com` for the
+  BYOK override) — if you add external resources, update the CSP.
 - CI/CD: `.github/workflows/deploy.yml` on push to `main` — Workload Identity Federation
   auth (no JSON keys), docker build/push to Artifact Registry (`asia-south1`), deploy to
   Cloud Run service `claimsahayak` (project `claim-sahayak`), with

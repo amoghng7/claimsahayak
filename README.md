@@ -53,11 +53,20 @@ npm run build      # strict typecheck + production build → dist/
 Works out of the box in **demo mode** (three synthetic case files). To analyze your own
 documents, the app calls Gemini through a server-side proxy by default: in the deployed
 container, nginx forwards `POST /api/gemini/generate` to the Gemini API with the key
-injected from **Secret Manager** — no key ever touches the client. For local development,
-set `VITE_GEMINI_API_KEY` in a local `.env`, or open **Settings → API key** and paste a
-Gemini API key (Google AI Studio → "Get API key") as a browser-direct override; that key
-is stored only in your browser's localStorage. See `plan/02-proxy-coherence.md` for the
-dev-proxy setup.
+injected from **Secret Manager** — no key ever touches the client. For local development
+the vite dev server runs the same proxy as middleware: set `GEMINI_API_KEY` in a local
+`.env` (see `.env.example`; without it the endpoint answers HTTP 428 and the app asks you
+for a key), or open **Settings → API key** and paste a Gemini API key (Google AI Studio →
+"Get API key") as a browser-direct override; that key is stored only in your browser's
+localStorage. The proxy endpoint is rate-limited to **20 requests/minute per client IP**
+(burst 10) with a 4 MB body cap, and answers with JSON 429/502 errors.
+
+To rotate the managed key in production:
+
+```bash
+gcloud secrets versions add gemini-api-key --data-file=-
+gcloud run services update claimsahayak --region=asia-south1   # pick up the new version
+```
 
 ## Verified against
 

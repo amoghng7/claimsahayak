@@ -25,17 +25,17 @@ protection on the public proxy endpoint.
 
 ### 2.1 Dev parity for the proxy (AUD-04)
 
-- [ ] In `vite.config.ts`, add a `configureServer` middleware for
+- [x] In `vite.config.ts`, add a `configureServer` middleware for
       `/api/gemini/generate` that mirrors the nginx behaviour: read
       `GEMINI_API_KEY` via `loadEnv`, forward the request body to
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=…`,
       stream the JSON response back. ~40 lines, no new dependencies (use
       global `fetch`).
-- [ ] If `GEMINI_API_KEY` is absent in dev, return HTTP 428 with a JSON body
+- [x] If `GEMINI_API_KEY` is absent in dev, return HTTP 428 with a JSON body
       `{ "error": "no_dev_key" }` and have the app surface: "No managed key in
       local dev — add GEMINI_API_KEY to .env or paste your own key in
       Settings."
-- [ ] `.env.example`: document `GEMINI_API_KEY` for local dev parity.
+- [x] `.env.example`: document `GEMINI_API_KEY` for local dev parity.
 
 ### 2.2 CSP vs BYOK (AUD-05)
 
@@ -44,41 +44,41 @@ Decide explicitly and implement one:
 - **Chosen:** keep BYOK as a deliberate feature. Extend the nginx CSP to
   `connect-src 'self' https://generativelanguage.googleapis.com` — still no
   wildcards, still a single fixed external host.
-- [ ] Update `nginx.conf.template` CSP accordingly, with a comment explaining
+- [x] Update `nginx.conf.template` CSP accordingly, with a comment explaining
       why that one host is allowed.
-- [ ] In BYOK mode the browser talks to Google directly — add a one-line note
+- [x] In BYOK mode the browser talks to Google directly — add a one-line note
       in Settings copy: "With your own key, requests go straight from your
       browser to Google."
 
 ### 2.3 Honest key-state UX (AUD-06)
 
-- [ ] `loadGeminiKey()` keeps the `'PROXY'` sentinel, but the UI never shows
+- [x] `loadGeminiKey()` keeps the `'PROXY'` sentinel, but the UI never shows
       it as a key. Header indicator becomes three-state: **Managed key** /
       **Your key** / **No key** (the last only when the dev 428 fired).
-- [ ] SettingsSheet: never pre-fill the input with `PROXY`. Empty input +
+- [x] SettingsSheet: never pre-fill the input with `PROXY`. Empty input +
       placeholder "Leave blank to use the managed key". When a personal key
       is stored, show a masked hint (`••••abcd`) and a "Remove my key" button
       that clears localStorage.
-- [ ] Saving a blank input clears the override (never stores an empty or
+- [x] Saving a blank input clears the override (never stores an empty or
       sentinel string).
 
 ### 2.4 Proxy hardening (AUD-07)
 
 In `nginx.conf.template`:
 
-- [ ] `limit_req_zone $binary_remote_addr zone=gemini:1m rate=20r/m;` at http
+- [x] `limit_req_zone $binary_remote_addr zone=gemini:1m rate=20r/m;` at http
       level; `limit_req zone=gemini burst=10 nodelay;` inside the
       `/api/gemini/generate` location. Return 429 with a JSON body.
-- [ ] `client_max_body_size 4m;` scoped to that location (PDF text payloads
+- [x] `client_max_body_size 4m;` scoped to that location (PDF text payloads
       are small; 4 MB is generous headroom).
-- [ ] `proxy_read_timeout 60s;` and map upstream 5xx/timeout to a JSON 502.
-- [ ] Do not log request bodies; ensure the access log line for this location
+- [x] `proxy_read_timeout 60s;` and map upstream 5xx/timeout to a JSON 502.
+- [x] Do not log request bodies; ensure the access log line for this location
       cannot include the upstream query string (the key lives in proxy_pass,
       never in the incoming URI — keep it that way).
-- [ ] App side: map 429 → "Too many requests — wait a minute and retry." and
+- [x] App side: map 429 → "Too many requests — wait a minute and retry." and
       502 → "The analysis service is unavailable right now." in the upload
       error UI.
-- [ ] README: document the rate limit and the secret-rotation procedure
+- [x] README: document the rate limit and the secret-rotation procedure
       (`gcloud secrets versions add gemini-api-key --data-file=-`).
 
 ## Acceptance criteria

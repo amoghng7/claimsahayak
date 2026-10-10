@@ -1,3 +1,8 @@
+# Rate-limit zone for the Gemini proxy (http context — this template is
+# included from conf.d). $binary_remote_addr survives envsubst: the nginx
+# image only substitutes defined environment variables.
+limit_req_zone $binary_remote_addr zone=gemini:1m rate=20r/m;
+
 server {
     listen ${PORT};
     server_name _;
@@ -20,16 +25,42 @@ server {
         limit_except POST {
             deny all;
         }
-        
+
+        # Abuse protection: 20 req/min per client IP, short burst, JSON errors
+        limit_req zone=gemini burst=10 nodelay;
+        limit_req_status 429;
+        # PDF text payloads are small; 4 MB is generous headroom
+        client_max_body_size 4m;
+
         resolver 8.8.8.8;
-        # Proxy strictly to the flash generateContent endpoint and inject the secret key
+        # Proxy strictly to the flash generateContent endpoint and inject the secret key.
+        # The key lives only in proxy_pass — never in $request_uri — so access
+        # logs cannot capture it. Request bodies are not logged.
         proxy_pass https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY};
         proxy_set_header Host generativelanguage.googleapis.com;
         proxy_ssl_server_name on;
-        
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 60s;
+
+        # Map upstream 5xx/timeouts to a JSON 502 instead of an HTML error page
+        proxy_intercept_errors on;
+        error_page 429 = @json429;
+        error_page 500 502 503 504 = @upstream_error;
+
         # Prevent forwarding client IP to Google
         proxy_set_header X-Real-IP "";
         proxy_set_header X-Forwarded-For "";
+    }
+
+    location @json429 {
+        default_type application/json;
+        return 429 '{"error":"rate_limited","message":"Too many requests — wait a minute and retry."}';
+    }
+
+    location @upstream_error {
+        default_type application/json;
+        return 502 '{"error":"upstream_unavailable","message":"The analysis service is unavailable right now."}';
     }
 
     # --- SPA routing: serve index.html for all paths ---
