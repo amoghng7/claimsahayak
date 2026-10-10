@@ -14,22 +14,24 @@ export function Kicker({ children, ok = false }: { children: ReactNode; ok?: boo
 export function NumberedSection({
   no,
   title,
+  id,
   children,
 }: {
   no: string
   title: string
+  id?: string
   children: ReactNode
 }) {
   return (
-    <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 md:gap-x-10">
+    <section aria-labelledby={id} className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 md:gap-x-10">
       <div className="font-display text-5xl md:text-7xl leading-none text-ink/25 select-none" aria-hidden>
         {no}
       </div>
       <div>
-        <h3 className="font-display text-2xl md:text-4xl leading-tight mb-3">{title}</h3>
+        <h3 id={id} className="font-display text-2xl md:text-4xl leading-tight mb-3">{title}</h3>
         <div className="text-ink-3 leading-relaxed max-w-2xl">{children}</div>
       </div>
-    </div>
+    </section>
   )
 }
 

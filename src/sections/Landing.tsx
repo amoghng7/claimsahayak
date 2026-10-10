@@ -3,13 +3,14 @@ import { ScoreStamp } from '../components/ScoreStamp'
 
 export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (id: string) => void }) {
   return (
-    <div>
+    <main>
       {/* ——— Hero: asymmetric editorial split, dossier card floating right ——— */}
-      <section className="mx-auto max-w-shell px-8 pt-16 pb-20 md:pt-24">
+      <section aria-labelledby="hero" className="mx-auto max-w-shell px-8 pt-16 pb-20 md:pt-24">
         <Kicker>Google Cloud AI Builder Cup · JAPAC 2026</Kicker>
         <div className="mt-8 grid gap-12 md:grid-cols-[1.25fr_1fr] md:gap-16 items-start">
           <div>
             <h1
+              id="hero"
               className="font-display font-semibold leading-[1.02]"
               style={{ fontSize: 'clamp(44px, 5.6vw, 68px)', letterSpacing: '-0.028em' }}
             >
@@ -86,7 +87,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
 
       {/* ——— Numbered editorial sections ——— */}
       <section className="mx-auto max-w-shell px-8 py-16 space-y-20">
-        <NumberedSection no="01" title="The trap nobody reads">
+        <NumberedSection no="01" id="section-01" title="The trap nobody reads">
           <p>
             Pick a room one category above your sub-limit and the insurer doesn&apos;t just
             refuse the excess rent — it pays <em>every</em> charge tied to room category
@@ -97,7 +98,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
           </p>
         </NumberedSection>
 
-        <NumberedSection no="02" title="The desk that reads first">
+        <NumberedSection no="02" id="section-02" title="The desk that reads first">
           <p>
             Upload the policy schedule, the discharge summary and the itemised bill. The desk
             checks your file against the IRDAI-standard document list, verifies every waiting
@@ -107,7 +108,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
           </p>
         </NumberedSection>
 
-        <NumberedSection no="03" title="The letter to write back">
+        <NumberedSection no="03" id="section-03" title="The letter to write back">
           <p>
             Already rejected? Paste the repudiation letter. The desk classifies the ground —
             non-disclosure, waiting period, deficiency, delay, sub-limit, exclusion — tells you
@@ -117,7 +118,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
           </p>
         </NumberedSection>
 
-        <NumberedSection no="04" title="In a language the family reads">
+        <NumberedSection no="04" id="section-04" title="In a language the family reads">
           <p>
             A verdict is useless if the person holding the hospital file can&apos;t read it.
             Every analysis closes with a plain Hindi summary —{' '}
@@ -128,13 +129,13 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
       </section>
 
       {/* ——— Dark section: how the desk thinks ——— */}
-      <section className="bg-ink text-paper">
+      <section aria-labelledby="principle" className="bg-ink text-paper">
         <div className="mx-auto max-w-shell px-8 py-20">
           <span className="kicker" style={{ color: 'color-mix(in srgb, var(--paper) 65%, transparent)' }}>
             <span className="pulse-dot ok" style={{ background: 'var(--chart)' }} aria-hidden />
             Design principle
           </span>
-          <h2 className="mt-6 font-display font-semibold leading-tight" style={{ fontSize: 'clamp(30px, 3.6vw, 46px)' }}>
+          <h2 id="principle" className="mt-6 font-display font-semibold leading-tight" style={{ fontSize: 'clamp(30px, 3.6vw, 46px)' }}>
             Arithmetic, not opinion.{' '}
             <em style={{ color: 'var(--chart)' }}>Words, grounded.</em>
           </h2>
@@ -164,8 +165,8 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
       </section>
 
       {/* ——— closing strip ——— */}
-      <section className="mx-auto max-w-shell px-8 py-16 flex flex-col items-start gap-6">
-        <h2 className="font-display font-semibold leading-tight" style={{ fontSize: 'clamp(28px, 3.4vw, 44px)' }}>
+      <section aria-labelledby="cta" className="mx-auto max-w-shell px-8 py-16 flex flex-col items-start gap-6">
+        <h2 id="cta" className="font-display font-semibold leading-tight" style={{ fontSize: 'clamp(28px, 3.4vw, 44px)' }}>
           Your claim is a document problem.{' '}
           <em>Solve it like one.</em>
         </h2>
@@ -180,6 +181,6 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
           documents you provide; the insurer&apos;s computation is final.
         </p>
       </section>
-    </div>
+    </main>
   )
 }

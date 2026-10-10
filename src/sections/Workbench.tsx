@@ -47,7 +47,7 @@ function CaseRail({
   const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="space-y-6">
-      <div>
+      <nav aria-label="Sample case files">
         <PanelTitle>Case files</PanelTitle>
         <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-0 lg:space-y-1 lg:overflow-visible lg:pb-0">
           {SAMPLE_CASES.map((c) => (
@@ -68,7 +68,7 @@ function CaseRail({
             </button>
           ))}
         </div>
-      </div>
+      </nav>
 
       <div>
         <PanelTitle right={busy ? <span className="font-mono text-[10px] text-ink-3">reading…</span> : undefined}>
@@ -207,13 +207,13 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
   return (
     <div className="space-y-10">
       <div className="flex flex-wrap items-center gap-8 border-b border-line pb-8">
-        <div className="h-[120px] w-[120px] overflow-hidden lg:h-[188px] lg:w-[188px]">
+        <div aria-live="polite" className="h-[120px] w-[120px] overflow-hidden lg:h-[188px] lg:w-[188px]">
           <div className="origin-top-left scale-[0.64] lg:scale-100">
             <ScoreStamp score={v.score} band={v.band} />
           </div>
         </div>
         <div className="min-w-56 flex-1">
-          <span className={`inline-block rounded-full px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${BAND_CHIP[v.band]}`}>
+          <span aria-live="polite" className={`inline-block rounded-full px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${BAND_CHIP[v.band]}`}>
             {BAND_LABEL[v.band]}
           </span>
           <h2 className="mt-3 font-display text-3xl font-semibold leading-tight">{c.claimant}</h2>
@@ -758,7 +758,7 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
   return (
     <div className="mx-auto max-w-shell px-6 py-8">
       <div className="grid gap-8 lg:grid-cols-[280px_1fr_360px]" data-print-hidden>
-        <aside>
+        <aside aria-label="Case files and policy terms">
           <CaseRail current={caseFile} onPick={pick} onFiles={onFiles} busy={busy} uploadNote={uploadNote} />
         </aside>
 
@@ -767,7 +767,7 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
           <BillLedger lines={lines} onChange={setLines} onReset={() => setLines(toEditable(baseline.episode.billLines))} dirty={linesDirty} />
         </main>
 
-        <aside className="space-y-8">
+        <aside aria-label="Rejection desk, letter and summaries" className="space-y-8">
           <RejectionDesk
             letter={letter}
             setLetter={setLetter}
