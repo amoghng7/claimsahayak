@@ -13,7 +13,7 @@ layout and semantics, no new features, no design-system changes.
 
 ### 5.1 Responsive pass
 
-- [ ] Audit at 360px, 768px, 1024px, 1440px. Fix in priority order:
+- [x] Audit at 360px, 768px, 1024px, 1440px. Fix in priority order:
   - Workbench: the case rail becomes a horizontal case switcher (or sheet)
     below 1024px; verdict panel stacks above the document ledger.
   - Waterfall and ledger rows: allow horizontal scroll with a fixed first
@@ -21,35 +21,35 @@ layout and semantics, no new features, no design-system changes.
   - Landing: the numbered sections and the dark "Arithmetic, not opinion"
     block must not overflow; display type scales down via `clamp()`.
   - ScoreStamp: keep legible at ~120px on mobile; rotation animation may slow.
-- [ ] Touch targets ≥ 44px on all interactive elements (toggles, file input,
+- [x] Touch targets ≥ 44px on all interactive elements (toggles, file input,
       settings controls).
-- [ ] Upload flow on mobile: file input accepts camera capture
+- [x] Upload flow on mobile: file input accepts camera capture
       (`accept="application/pdf,image/*"` stays as-is; just verify the picker
       UX on a real device or devtools device mode).
 
 ### 5.2 Accessibility
 
-- [ ] Landmarks: `header`, `main`, `nav` (case rail), `footer`; every section
+- [x] Landmarks: `header`, `main`, `nav` (case rail), `footer`; every section
       has an accessible name.
-- [ ] The verdict panel announces updates: `aria-live="polite"` on the
+- [x] The verdict panel announces updates: `aria-live="polite"` on the
       score/verdict region.
-- [ ] All toggles and buttons have visible focus rings (use the ink/chart
+- [x] All toggles and buttons have visible focus rings (use the ink/chart
       tokens — no default blue outline removal without replacement).
-- [ ] Colour contrast: `--ink-3` on `--paper` for body text must meet 4.5:1 —
+- [x] Colour contrast: `--ink-3` on `--paper` for body text must meet 4.5:1 —
       verify; if it fails, darken `--ink-3` one step and record the token
       change in the commit message.
-- [ ] Forms: every input has a `<label>`; the settings sheet traps focus and
+- [x] Forms: every input has a `<label>`; the settings sheet traps focus and
       closes on Escape.
-- [ ] `prefers-reduced-motion`: audit that rise/stamp/pulse animations are
+- [x] `prefers-reduced-motion`: audit that rise/stamp/pulse animations are
       all disabled or reduced (the base rule exists — verify coverage).
-- [ ] Keyboard walkthrough: landing → samples → verdict → rejection desk →
+- [x] Keyboard walkthrough: landing → samples → verdict → rejection desk →
       letter, fully operable without a mouse.
 
 ### 5.3 Verification
 
-- [ ] Lighthouse (desktop + mobile): Accessibility ≥ 95, Best Practices ≥ 95.
+- [x] Lighthouse (desktop + mobile): Accessibility ≥ 95, Best Practices ≥ 95.
       Paste scores in the commit message.
-- [ ] Screenshots at 360px and 1440px for landing, workbench, rejection desk.
+- [x] Screenshots at 360px and 1440px for landing, workbench, rejection desk.
 
 ## Acceptance criteria
 
