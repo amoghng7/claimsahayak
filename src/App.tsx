@@ -1,26 +1,46 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Landing } from './sections/Landing'
 import { Workbench } from './sections/Workbench'
-import { loadGeminiKey, saveGeminiKey } from './engine/gemini'
+import {
+  isDevKeyMissing,
+  maskKey,
+  onKeyStateChange,
+  resolveKeyState,
+  saveGeminiKey,
+  storedPersonalKey,
+} from './engine/gemini'
+
+function useKeyState() {
+  const [state, setState] = useState(() => resolveKeyState(storedPersonalKey(), isDevKeyMissing()))
+  useEffect(
+    () => onKeyStateChange(() => setState(resolveKeyState(storedPersonalKey(), isDevKeyMissing()))),
+    [],
+  )
+  return [state, () => setState(resolveKeyState(storedPersonalKey(), isDevKeyMissing()))] as const
+}
 
 function SettingsSheet({
-  open,
   onClose,
   onSaved,
 }: {
-  open: boolean
   onClose: () => void
   onSaved: () => void
 }) {
-  const [draft, setDraft] = useState(loadGeminiKey())
-  if (!open) return null
+  // Mounted only while open — initial state is always the current stored key.
+  const [stored] = useState<string | null>(() => storedPersonalKey())
+  const [draft, setDraft] = useState('')
+  const removeKey = () => {
+    saveGeminiKey('')
+    onSaved()
+    onClose()
+  }
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" onClick={onClose}>
       <div className="panel w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-2xl font-semibold">Settings</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-3">
-          The desk uses a secure managed backend key to extract data from your uploaded PDFs. 
-          If you prefer to use your own key (or if the backend is rate-limited), you can 
+          The desk uses a secure managed backend key to extract data from your uploaded PDFs.
+          If you prefer to use your own key (or if the backend is rate-limited), you can
           override it here. The key never leaves your browser.
         </p>
         <label className="mt-4 block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
@@ -30,9 +50,14 @@ function SettingsSheet({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           type="password"
-          placeholder="AIza…"
+          placeholder="Leave blank to use the managed key"
           className="mt-1.5 w-full border border-line bg-paper-2 px-3 py-2.5 font-mono text-[13px] focus:outline-none focus:ring-2 focus:ring-brick"
         />
+        {stored && (
+          <p className="mt-2 font-mono text-[11px] text-ink-3">
+            Your key is in use: {maskKey(stored)}
+          </p>
+        )}
         <div className="mt-5 flex gap-3">
           <button
             onClick={() => {
@@ -44,21 +69,17 @@ function SettingsSheet({
           >
             Save key
           </button>
-          <button
-            onClick={() => {
-              setDraft('')
-              saveGeminiKey('')
-              onSaved()
-              onClose()
-            }}
-            className="rounded-full border border-ink/40 px-6 py-2.5 font-mono text-[11px] uppercase tracking-[0.12em]"
-          >
-            Clear
-          </button>
+          {stored && (
+            <button
+              onClick={removeKey}
+              className="rounded-full border border-ink/40 px-6 py-2.5 font-mono text-[11px] uppercase tracking-[0.12em]"
+            >
+              Remove my key
+            </button>
+          )}
         </div>
         <p className="mt-4 font-mono text-[10px] leading-relaxed text-ink-3">
-          Production path: this call moves server-side to Vertex AI on Google Cloud, with the
-          key held in Secret Manager — see README.
+          With your own key, requests go straight from your browser to Google.
         </p>
       </div>
     </div>
@@ -69,7 +90,9 @@ export default function App() {
   const [view, setView] = useState<'landing' | 'desk'>('landing')
   const [initialCase, setInitialCase] = useState<string | undefined>()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [hasKey, setHasKey] = useState(!!loadGeminiKey())
+  const [keyState, refreshKeyState] = useKeyState()
+  const keyLabel =
+    keyState === 'personal' ? 'Your key' : keyState === 'managed' ? 'Managed key' : 'No key'
 
   const openDesk = (caseId?: string) => {
     setInitialCase(caseId)
@@ -94,9 +117,9 @@ export default function App() {
             >
               <span
                 className="h-1.5 w-1.5 rounded-full"
-                style={{ background: hasKey ? 'color-mix(in srgb, var(--mint) 70%, var(--ink))' : 'var(--crimson)' }}
+                style={{ background: keyState === 'none' ? 'var(--crimson)' : 'color-mix(in srgb, var(--mint) 70%, var(--ink))' }}
               />
-              {hasKey ? 'Key set' : 'API key'}
+              {keyLabel}
             </button>
             {view === 'landing' ? (
               <button
@@ -130,7 +153,9 @@ export default function App() {
         </div>
       </footer>
 
-      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={() => setHasKey(!!loadGeminiKey())} />
+      {settingsOpen && (
+        <SettingsSheet onClose={() => setSettingsOpen(false)} onSaved={refreshKeyState} />
+      )}
     </div>
   )
 }

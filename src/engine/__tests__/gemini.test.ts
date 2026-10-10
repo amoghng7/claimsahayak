@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { extractCaseWithGemini } from '../gemini'
+import {
+  extractCaseWithGemini,
+  loadGeminiKey,
+  maskKey,
+  resolveKeyState,
+  saveGeminiKey,
+  storedPersonalKey,
+} from '../gemini'
 
 const VALID_PAYLOAD = {
   claimant: 'Test Claimant',
@@ -120,5 +127,80 @@ describe('extractCaseWithGemini — schema validation', () => {
     const c = await extractCaseWithGemini('test-key', DOCS)
     expect(c.patientAge).toBe(42)
     expect(spy).toHaveBeenCalledTimes(2)
+  })
+})
+
+function errorResponse(status: number) {
+  return { ok: false, status, text: async () => '' } as Response
+}
+
+describe('extractCaseWithGemini — proxy error mapping', () => {
+  it('428 from the dev middleware explains the missing managed key', async () => {
+    mockFetchSequence(errorResponse(428))
+    await expect(extractCaseWithGemini('PROXY', DOCS)).rejects.toThrow(
+      'No managed key in local dev',
+    )
+  })
+
+  it('429 maps to a rate-limit message', async () => {
+    mockFetchSequence(errorResponse(429))
+    await expect(extractCaseWithGemini('PROXY', DOCS)).rejects.toThrow(
+      'Too many requests — wait a minute and retry.',
+    )
+  })
+
+  it('502 maps to a service-unavailable message', async () => {
+    mockFetchSequence(errorResponse(502))
+    await expect(extractCaseWithGemini('PROXY', DOCS)).rejects.toThrow(
+      'The analysis service is unavailable right now.',
+    )
+  })
+})
+
+describe('key-state helpers', () => {
+  function stubLocalStorage() {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+      clear: () => store.clear(),
+    })
+    return store
+  }
+
+  it('loadGeminiKey defaults to the PROXY sentinel', () => {
+    stubLocalStorage()
+    expect(loadGeminiKey()).toBe('PROXY')
+    expect(storedPersonalKey()).toBeNull()
+  })
+
+  it('returns a stored personal key', () => {
+    stubLocalStorage()
+    saveGeminiKey('AIza-personal-key')
+    expect(loadGeminiKey()).toBe('AIza-personal-key')
+    expect(storedPersonalKey()).toBe('AIza-personal-key')
+  })
+
+  it('never stores an empty key or the PROXY sentinel', () => {
+    const store = stubLocalStorage()
+    saveGeminiKey('AIza-personal-key')
+    saveGeminiKey('')
+    expect(loadGeminiKey()).toBe('PROXY')
+    saveGeminiKey('PROXY')
+    expect(storedPersonalKey()).toBeNull()
+    expect(store.size).toBe(0)
+  })
+
+  it('maskKey reveals only the last four characters', () => {
+    expect(maskKey('AIzaSySecret1234')).toBe('••••1234')
+    expect(maskKey('abcd')).toBe('••••abcd')
+  })
+
+  it('resolveKeyState covers managed, personal and none', () => {
+    expect(resolveKeyState(null, false)).toBe('managed')
+    expect(resolveKeyState('AIza-x', false)).toBe('personal')
+    expect(resolveKeyState('AIza-x', true)).toBe('personal')
+    expect(resolveKeyState(null, true)).toBe('none')
   })
 })

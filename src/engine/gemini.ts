@@ -86,11 +86,18 @@ async function requestGemini(apiKey: string, prompt: string): Promise<string> {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
+    if (res.status === 428) {
+      markDevKeyMissing()
+      throw new Error('No managed key in local dev — add GEMINI_API_KEY to .env or paste your own key in Settings.')
+    }
     if (res.status === 400 || res.status === 403) {
       throw new Error('Gemini rejected the request — check the API key. Demo mode still works without one.')
     }
     if (res.status === 429) {
-      throw new Error('Gemini quota exhausted for now — retry shortly, or keep exploring the bundled sample cases.')
+      throw new Error('Too many requests — wait a minute and retry.')
+    }
+    if (res.status === 502) {
+      throw new Error('The analysis service is unavailable right now.')
     }
     throw new Error(`Gemini request failed (${res.status}). ${detail.slice(0, 160)}`)
   }
@@ -144,18 +151,57 @@ export async function extractCaseWithGemini(apiKey: string, docs: DocText[]): Pr
 }
 
 const KEY_STORAGE = 'claimsahayak.geminiKey'
+const PROXY_SENTINEL = 'PROXY'
+const KEY_STATE_EVENT = 'claimsahayak:keystate'
+
+let devKeyMissing = false
+
+function markDevKeyMissing() {
+  if (devKeyMissing) return
+  devKeyMissing = true
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(KEY_STATE_EVENT))
+  }
+}
+
+export function isDevKeyMissing(): boolean {
+  return devKeyMissing
+}
+
+export function onKeyStateChange(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(KEY_STATE_EVENT, listener)
+  return () => window.removeEventListener(KEY_STATE_EVENT, listener)
+}
+
+export type KeyState = 'managed' | 'personal' | 'none'
+
+export function resolveKeyState(personal: string | null, missingDevKey: boolean): KeyState {
+  if (personal) return 'personal'
+  return missingDevKey ? 'none' : 'managed'
+}
+
+export function maskKey(key: string): string {
+  return `••••${key.slice(-4)}`
+}
+
+export function storedPersonalKey(): string | null {
+  try {
+    const stored = localStorage.getItem(KEY_STORAGE)
+    return stored && stored !== PROXY_SENTINEL ? stored : null
+  } catch {
+    return null
+  }
+}
 
 export function loadGeminiKey(): string {
-  try {
-    return localStorage.getItem(KEY_STORAGE) || 'PROXY'
-  } catch {
-    return 'PROXY'
-  }
+  return storedPersonalKey() ?? PROXY_SENTINEL
 }
 
 export function saveGeminiKey(key: string) {
   try {
-    if (key) localStorage.setItem(KEY_STORAGE, key)
+    // The sentinel is routing state, not a credential — never persist it.
+    if (key && key !== PROXY_SENTINEL) localStorage.setItem(KEY_STORAGE, key)
     else localStorage.removeItem(KEY_STORAGE)
   } catch {
     /* private mode — key simply won't persist */

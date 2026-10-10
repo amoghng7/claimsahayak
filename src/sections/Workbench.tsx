@@ -12,7 +12,7 @@ import { buildGrievanceLetter } from '../engine/grievance'
 import { hindiSummary } from '../engine/hindi'
 import { formatINR, formatDate } from '../engine/format'
 import { fileToDocText } from '../engine/pdf'
-import { extractCaseWithGemini, loadGeminiKey } from '../engine/gemini'
+import { extractCaseWithGemini, loadGeminiKey, storedPersonalKey } from '../engine/gemini'
 import { CASE_LABELS, SAMPLE_CASES } from '../data/samples'
 import { PanelTitle } from '../components/kit'
 import { ScoreStamp } from '../components/ScoreStamp'
@@ -96,9 +96,9 @@ function CaseRail({
         />
         {uploadNote && <p className="mt-2 text-xs leading-relaxed text-ink-3">{uploadNote}</p>}
         <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-3">
-          {loadGeminiKey()
-            ? 'Gemini key set — live extraction on.'
-            : 'No Gemini key set — demo mode on the sample files. Add one in Settings (top right) to read your own PDFs.'}
+          {storedPersonalKey()
+            ? 'Using your Gemini key — live extraction on.'
+            : 'Managed key — live extraction on. Add your own in Settings (top right) to override.'}
         </p>
       </div>
 
@@ -413,10 +413,6 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
 
   const onFiles = async (files: FileList) => {
     const key = loadGeminiKey()
-    if (!key) {
-      setUploadNote('Add a Gemini API key (Settings, top right) to extract your own documents. The sample case files above work without one.')
-      return
-    }
     setBusy(true)
     setUploadNote(null)
     try {
