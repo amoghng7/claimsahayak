@@ -33,3 +33,6 @@ Dockerfile.local
 
 # GCP
 .gcloudignore
+
+# local scratch fixtures
+scratch/

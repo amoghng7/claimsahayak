@@ -24,6 +24,7 @@ export const policySchema = z.object({
   pedWaitingYears: z.number().nonnegative(),
   specificWaitingYears: z.number().nonnegative(),
   specificDiseases: z.array(z.string()),
+  exclusions: z.array(z.string()),
 })
 
 export const billLineSchema = z.object({
@@ -91,10 +92,12 @@ export const EXTRACTION_RESPONSE_SCHEMA = {
         pedWaitingYears: { type: 'NUMBER' },
         specificWaitingYears: { type: 'NUMBER' },
         specificDiseases: { type: 'ARRAY', items: { type: 'STRING' } },
+        exclusions: { type: 'ARRAY', items: { type: 'STRING' } },
       },
       required: [
         'insurer', 'product', 'policyNo', 'inceptionDate', 'sumInsured', 'roomRent',
         'copayPct', 'initialWaitingDays', 'pedWaitingYears', 'specificWaitingYears', 'specificDiseases',
+        'exclusions',
       ],
     },
     episode: {

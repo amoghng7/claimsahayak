@@ -158,10 +158,13 @@ function Waterfall({ v }: { v: Verdict }) {
     ['Total billed', p.total, 'var(--ink)', false],
     ['Room-rent excess', -p.roomCut, 'var(--crimson)', true],
     ['Proportional cut on linked charges', -p.proportionalCut, 'var(--crimson)', true],
+  ]
+  if (p.exclusionCut > 0) rows.push(['Permanent-exclusion cut', -p.exclusionCut, 'var(--crimson)', true])
+  rows.push(
     ['Non-payable consumables', -p.nonPayableCut, 'var(--brick)', true],
     ['Co-payment', -p.copayCut, 'var(--brick)', true],
     ['Expected settlement', p.expected, 'color-mix(in srgb, var(--mint) 55%, var(--paper))', false],
-  ]
+  )
   return (
     <div className="ledger font-mono text-[12.5px]">
       {rows.map(([label, amount, color, signed], i) => (
@@ -238,6 +241,35 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
           Estimate from extracted figures. The insurer&apos;s computation is final; the point is to know the number before they tell you.
         </p>
       </div>
+
+      {c.policy.exclusions.length > 0 && (
+        <div>
+          <PanelTitle right={<span className="font-mono text-[10px] text-ink-3">{c.policy.exclusions.length} listed</span>}>
+            Permanent exclusions in this policy
+          </PanelTitle>
+          <div className="border border-line">
+            {c.policy.exclusions.map((e, i) => {
+              const hit = v.exclusions.hits.includes(e)
+              return (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line-faint last:border-0"
+                >
+                  <span className="text-[13px]">{e}</span>
+                  {hit && (
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-crimson">
+                      matches this treatment
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          <p className="mt-2 font-mono text-[10.5px] text-ink-3">
+            Permanent exclusions are never payable, however long the policy has run.
+          </p>
+        </div>
+      )}
 
       <div>
         <PanelTitle right={<span className="font-mono text-[10px] text-ink-3">{v.missing.length} gaps</span>}>

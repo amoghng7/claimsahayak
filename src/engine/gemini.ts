@@ -28,7 +28,8 @@ From the document texts below, produce ONE JSON object with EXACTLY this shape
     "roomRent": { "type": "percent_si" | "daily_cap" | "no_limit" | "single_room", "value": number | null },
     "copayPct": number, "initialWaitingDays": number,
     "pedWaitingYears": number, "specificWaitingYears": number,
-    "specificDiseases": string[]
+    "specificDiseases": string[],
+    "exclusions": string[]
   },
   "episode": {
     "hospital": string, "city": string,
@@ -46,6 +47,7 @@ Rules:
 - Use null or a sensible default when a field is absent; never invent policy terms you cannot see.
 - providedDocIds must use ids from: claim-form, discharge-summary, final-bill, investigations, prescriptions, pharmacy, policy-copy, kyc, neft, fir, implant.
 - roomLinked = true for heads that insurers tie to room category (surgeon/ consultant fees, nursing, OT charges); isRoomRent = true for the room & nursing rent line itself; nonPayable = true for consumables (gloves, masks, syringes, etc.).
+- exclusions = the policy schedule's permanent exclusions as short labels (e.g. "Cosmetic surgery", "Dental treatment").
 - All money in INR numbers, dates ISO.
 
 DOCUMENTS:

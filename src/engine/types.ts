@@ -18,6 +18,8 @@ export interface Policy {
   pedWaitingYears: number
   specificWaitingYears: number
   specificDiseases: string[]
+  /** permanent exclusions as printed in the policy schedule */
+  exclusions: string[]
 }
 
 export interface BillLine {

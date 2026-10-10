@@ -5,6 +5,7 @@ import {
   analyzeRejection,
   buildVerdict,
   estimatePayable,
+  exclusionCheck,
   missingDocs,
   roomRentAnalysis,
   waitingPeriodCheck,
@@ -26,6 +27,7 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
     pedWaitingYears: 3,
     specificWaitingYears: 2,
     specificDiseases: ['Cataract'],
+    exclusions: [],
     ...overrides,
   }
 }
@@ -151,6 +153,59 @@ describe('waitingPeriodCheck', () => {
     c.episode.admissionDate = '2026-01-10'
     c.episode.accidentRelated = true
     expect(waitingPeriodCheck(c)).toHaveLength(0)
+  })
+})
+
+describe('exclusionCheck — permanent exclusions (AUD-11)', () => {
+  it('matches the episode diagnosis/procedure against the exclusion list, case-insensitive', () => {
+    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery'] }) })
+    c.episode.diagnosis = 'Rhinoplasty — COSMETIC SURGERY'
+    c.episode.procedure = 'Cosmetic surgery — rhinoplasty'
+    const chk = exclusionCheck(c.policy, c.episode)
+    expect(chk.hits).toContain('Cosmetic surgery')
+  })
+
+  it('respects word boundaries — "Hernia" does not match "Herniated disc"', () => {
+    const c = makeCase({ policy: makePolicy({ exclusions: ['Hernia'] }) })
+    c.episode.diagnosis = 'Herniated disc prolapse'
+    c.episode.procedure = 'Discectomy'
+    expect(exclusionCheck(c.policy, c.episode).hits).toHaveLength(0)
+  })
+
+  it('excludes matching bill lines from the payable estimate', () => {
+    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery'] }) })
+    c.episode.diagnosis = 'Cosmetic surgery — rhinoplasty'
+    c.episode.billLines = [
+      { head: 'Room & nursing charges', amount: 12000, roomLinked: false, isRoomRent: true },
+      { head: 'Cosmetic surgery package (rhinoplasty)', amount: 60000, roomLinked: false },
+      { head: 'Medicines', amount: 8000, roomLinked: false },
+    ]
+    c.episode.totalBill = 80000
+    const chk = exclusionCheck(c.policy, c.episode)
+    expect(chk.excludedLines).toHaveLength(1)
+    expect(chk.excludedAmount).toBe(60000)
+    const p = estimatePayable(c)
+    expect(p.exclusionCut).toBe(60000)
+    // 80000 − 60000 = 20000; excluded line is not double-counted elsewhere
+    expect(p.expected).toBe(20000)
+  })
+
+  it('buildVerdict raises a crimson exclusion flag', () => {
+    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery'] }) })
+    c.episode.diagnosis = 'Cosmetic surgery — rhinoplasty'
+    const v = buildVerdict(c)
+    const flag = v.flags.find((f) => f.kind === 'exclusion')
+    expect(flag).toBeDefined()
+    expect(flag!.severity).toBe('high')
+    expect(flag!.title).toBe("This treatment appears in the policy's permanent exclusions")
+  })
+
+  it('clean policy: no hits, no excluded lines, zero exclusion cut', () => {
+    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery', 'Dental treatment'] }) })
+    const chk = exclusionCheck(c.policy, c.episode)
+    expect(chk.hits).toHaveLength(0)
+    expect(chk.excludedAmount).toBe(0)
+    expect(estimatePayable(c).exclusionCut).toBe(0)
   })
 })
 

@@ -23,6 +23,7 @@ const VALID_PAYLOAD = {
     pedWaitingYears: 3,
     specificWaitingYears: 2,
     specificDiseases: ['Cataract'],
+    exclusions: ['Cosmetic surgery'],
   },
   episode: {
     hospital: 'Test Hospital',

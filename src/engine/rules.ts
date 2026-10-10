@@ -1,4 +1,4 @@
-import type { CaseFile, HospitalEpisode, Policy } from './types'
+import type { BillLine, CaseFile, HospitalEpisode, Policy } from './types'
 import { daysBetween, yearsBetween } from './format'
 
 /* ------------------------------------------------------------------ */
@@ -64,16 +64,62 @@ export interface RoomRentAnalysis {
  * The trap: pick a room above your sub-limit and the insurer doesn't just
  * cut the room rent — it scales down every charge linked to room category
  * by the same ratio. Deterministic arithmetic; no model involved.
+ *
+ * `omit` excludes lines already fully deducted elsewhere (permanent
+ * exclusions, PED waits) so they are never cut twice.
  */
-export function roomRentAnalysis(policy: Policy, ep: HospitalEpisode): RoomRentAnalysis | null {
+export function roomRentAnalysis(
+  policy: Policy,
+  ep: HospitalEpisode,
+  omit?: (l: BillLine) => boolean,
+): RoomRentAnalysis | null {
   const allowed = allowedRoomRent(policy)
   if (allowed === null || ep.roomRentPerDay <= allowed) return null
   const ratio = allowed / ep.roomRentPerDay
   const roomCut = (ep.roomRentPerDay - allowed) * ep.roomDays
   const proportionalCut = ep.billLines
-    .filter((l) => l.roomLinked && !l.isRoomRent)
+    .filter((l) => l.roomLinked && !l.isRoomRent && !omit?.(l))
     .reduce((sum, l) => sum + l.amount * (1 - ratio), 0)
   return { allowed, actual: ep.roomRentPerDay, ratio, roomCut, proportionalCut }
+}
+
+/* ------------------------------------------------------------------ */
+/* Keyword matching (exclusions, PEDs, sub-limits)                     */
+/* ------------------------------------------------------------------ */
+
+/** Case-insensitive word-boundary match — "Hernia" must not fire on "Herniated". */
+function containsKeyword(text: string, keyword: string): boolean {
+  const esc = keyword
+    .trim()
+    .toLowerCase()
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (!esc) return false
+  return new RegExp(`(?:^|[^a-z0-9])${esc}(?:[^a-z0-9]|$)`, 'i').test(text.toLowerCase())
+}
+
+/* ------------------------------------------------------------------ */
+/* Permanent exclusions                                                */
+/* ------------------------------------------------------------------ */
+
+export interface ExclusionCheck {
+  /** exclusion clauses matched against the diagnosis / procedure */
+  hits: string[]
+  /** bill lines whose head matches an exclusion clause */
+  excludedLines: BillLine[]
+  excludedAmount: number
+}
+
+export function exclusionCheck(policy: Policy, ep: HospitalEpisode): ExclusionCheck {
+  const treatmentText = `${ep.diagnosis} ${ep.procedure}`
+  const hits = policy.exclusions.filter((e) => containsKeyword(treatmentText, e))
+  const excludedLines = ep.billLines.filter((l) =>
+    policy.exclusions.some((e) => containsKeyword(l.head, e)),
+  )
+  return {
+    hits,
+    excludedLines,
+    excludedAmount: excludedLines.reduce((s, l) => s + l.amount, 0),
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,6 +167,7 @@ export interface PayableEstimate {
   total: number
   roomCut: number
   proportionalCut: number
+  exclusionCut: number
   nonPayableCut: number
   copayCut: number
   expected: number
@@ -128,16 +175,22 @@ export interface PayableEstimate {
 
 export function estimatePayable(c: CaseFile): PayableEstimate {
   const ep = c.episode
-  const rr = roomRentAnalysis(c.policy, ep)
+  const excl = exclusionCheck(c.policy, ep)
+  const excluded = new Set(excl.excludedLines)
+  const rr = roomRentAnalysis(c.policy, ep, (l) => excluded.has(l))
   const roomCut = rr?.roomCut ?? 0
   const proportionalCut = rr?.proportionalCut ?? 0
-  const nonPayableCut = ep.billLines.filter((l) => l.nonPayable).reduce((s, l) => s + l.amount, 0)
-  const admissible = Math.max(0, ep.totalBill - roomCut - proportionalCut - nonPayableCut)
+  const exclusionCut = excl.excludedAmount
+  const nonPayableCut = ep.billLines
+    .filter((l) => l.nonPayable && !excluded.has(l))
+    .reduce((s, l) => s + l.amount, 0)
+  const admissible = Math.max(0, ep.totalBill - roomCut - proportionalCut - exclusionCut - nonPayableCut)
   const copayCut = (admissible * c.policy.copayPct) / 100
   return {
     total: ep.totalBill,
     roomCut,
     proportionalCut,
+    exclusionCut,
     nonPayableCut,
     copayCut,
     expected: Math.max(0, admissible - copayCut),
@@ -151,7 +204,7 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
 export type Band = 'strong' | 'fair' | 'weak'
 
 export interface DeductionFlag {
-  kind: 'room_rent' | 'proportional' | 'copay' | 'non_payable' | 'waiting'
+  kind: 'room_rent' | 'proportional' | 'copay' | 'non_payable' | 'waiting' | 'exclusion'
   severity: 'high' | 'medium'
   title: string
   detail: string
@@ -173,12 +226,14 @@ export interface Verdict {
   payable: PayableEstimate
   roomRent: RoomRentAnalysis | null
   waiting: WaitingFlag[]
+  exclusions: ExclusionCheck
 }
 
 export function buildVerdict(c: CaseFile): Verdict {
   const missing = missingDocs(c)
   const waiting = waitingPeriodCheck(c)
   const payable = estimatePayable(c)
+  const exclusions = exclusionCheck(c.policy, c.episode)
   const rr = roomRentAnalysis(c.policy, c.episode)
   const flags: DeductionFlag[] = []
   const reasons: Reason[] = []
@@ -216,6 +271,18 @@ export function buildVerdict(c: CaseFile): Verdict {
     reasons.push({ ok: false, label: `Room-rent trap: ${Math.round((1 - rr.ratio) * 100)}% proportional cut exposure` })
   } else {
     reasons.push({ ok: true, label: 'Room category within sub-limit' })
+  }
+
+  if (exclusions.hits.length > 0) {
+    flags.push({
+      kind: 'exclusion',
+      severity: 'high',
+      title: "This treatment appears in the policy's permanent exclusions",
+      detail: `The diagnosis or procedure matches: ${exclusions.hits.join(', ')}. Permanent exclusions are never payable, however old the policy.`,
+      amountAtRisk: exclusions.excludedAmount,
+      clause: 'Policy schedule — Permanent Exclusions; IRDAI HPR 2024 standardised exclusion wording.',
+    })
+    reasons.push({ ok: false, label: `Permanent exclusion hit: ${exclusions.hits[0]}` })
   }
 
   if (waiting.length > 0) {
@@ -262,7 +329,7 @@ export function buildVerdict(c: CaseFile): Verdict {
 
   score = Math.max(0, Math.min(100, Math.round(score)))
   const band: Band = score >= 75 ? 'strong' : score >= 50 ? 'fair' : 'weak'
-  return { score, band, reasons, missing, flags, payable, roomRent: rr, waiting }
+  return { score, band, reasons, missing, flags, payable, roomRent: rr, waiting, exclusions }
 }
 
 /* ------------------------------------------------------------------ */

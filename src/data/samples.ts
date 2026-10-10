@@ -24,6 +24,12 @@ export const SAMPLE_CASES: CaseFile[] = [
       pedWaitingYears: 3,
       specificWaitingYears: 2,
       specificDiseases: ['Cataract', 'Hernia', 'Hydrocele', 'Cholecystitis', 'Knee replacement'],
+      exclusions: [
+        'Cosmetic or aesthetic surgery',
+        'Dental treatment unless accidental',
+        'Refractive error correction',
+        'Infertility treatment',
+      ],
     },
     episode: {
       hospital: 'Sagar Multispeciality Hospital',
@@ -67,6 +73,11 @@ export const SAMPLE_CASES: CaseFile[] = [
       pedWaitingYears: 3,
       specificWaitingYears: 2,
       specificDiseases: ['Cataract', 'Hernia', 'Knee replacement'],
+      exclusions: [
+        'Cosmetic or aesthetic surgery',
+        'Dental treatment unless accidental',
+        'Refractive error correction',
+      ],
     },
     episode: {
       hospital: 'Deenanath City Hospital',
@@ -119,6 +130,11 @@ export const SAMPLE_CASES: CaseFile[] = [
       pedWaitingYears: 3,
       specificWaitingYears: 2,
       specificDiseases: ['Cataract', 'Hernia', 'Hydrocele', 'Joint replacement'],
+      exclusions: [
+        'Cosmetic or aesthetic surgery',
+        'Dental treatment unless accidental',
+        'Domiciliary treatment',
+      ],
     },
     episode: {
       hospital: 'Mercy General Hospital',
