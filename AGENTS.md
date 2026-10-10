@@ -30,7 +30,7 @@ is stateless: no accounts, no database, no server-side sessions.
 - react-router 7 (`BrowserRouter` in `src/main.tsx`) — note: routing is effectively
   unused; navigation is view state in `src/App.tsx` (`'landing' | 'desk'`)
 - pdfjs-dist 4 (client-side PDF text-layer extraction)
-- Gemini Developer API (`gemini-2.5-flash`, JSON mode) via `fetch` — no SDK
+- Gemini Developer API (`gemini-3.8-flash`, JSON mode) via `fetch` — no SDK
 - Declared in `package.json` but **not currently imported anywhere in `src/`**:
   `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`. Do not assume
   they are used; either use them deliberately or leave them alone.

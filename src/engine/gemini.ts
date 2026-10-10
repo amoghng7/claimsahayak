@@ -4,7 +4,7 @@ import type { z } from 'zod'
 
 /**
  * Live extraction path: raw document text → structured CaseFile via the
- * Gemini Developer API (gemini-2.5-flash, JSON mode). The browser talks to
+ * Gemini Developer API (gemini-3.8-flash, JSON mode). The browser talks to
  * Gemini directly with the user's own key; in a production deployment this
  * call moves server-side to Vertex AI on Google Cloud (see README).
  *
@@ -12,7 +12,7 @@ import type { z } from 'zod'
  * bundled synthetic case files.
  */
 
-const MODEL = 'gemini-2.5-flash'
+const MODEL = 'gemini-3.8-flash'
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
 
 const PROMPT = `You are the extraction layer of an Indian health-insurance claim-readiness tool.

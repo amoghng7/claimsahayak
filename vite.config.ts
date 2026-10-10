@@ -14,7 +14,7 @@ try {
   /* not installed outside the sandbox — fine */
 }
 
-const GEMINI_MODEL = 'gemini-2.5-flash'
+const GEMINI_MODEL = 'gemini-3.8-flash'
 
 function readBody(req: Connect.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {

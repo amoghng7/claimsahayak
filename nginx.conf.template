@@ -36,7 +36,7 @@ server {
         # Proxy strictly to the flash generateContent endpoint and inject the secret key.
         # The key lives only in proxy_pass — never in $request_uri — so access
         # logs cannot capture it. Request bodies are not logged.
-        proxy_pass https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY};
+        proxy_pass https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY};
         proxy_set_header Host generativelanguage.googleapis.com;
         proxy_ssl_server_name on;
 
