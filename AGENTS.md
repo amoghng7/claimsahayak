@@ -5,8 +5,9 @@ actual state of the code — when this file and the README disagree, trust this 
 
 ## Project overview
 
-ClaimSahayak ("Claim Readiness Desk") is a **client-side-only React SPA** built for the
-Google Cloud AI Builder Cup 2026 (JAPAC). It analyses Indian health-insurance claims:
+ClaimSahayak ("Claim Readiness Desk") is a **React SPA with a minimal same-origin
+sidecar** built for the Google Cloud AI Builder Cup 2026 (JAPAC). It analyses Indian
+health-insurance claims:
 given a policy schedule and hospital bill (or one of three bundled synthetic case files),
 it computes a claim-readiness score, flags deduction traps (room-rent sub-limit,
 proportional deduction, co-pay, non-payables, waiting-period breaches), estimates the
@@ -18,8 +19,11 @@ by a deterministic TypeScript rules engine (`src/engine/rules.ts`). Gemini is us
 turn uploaded documents into structured facts; it never computes money or scores. Keep it
 that way — do not move judgement/math into LLM prompts.
 
-There is **no backend in this repo** and no persisted state beyond `localStorage`. The app
-is stateless: no accounts, no database, no server-side sessions.
+The app itself is stateless: no accounts, no database, no server-side sessions; nothing
+persists beyond the user's `localStorage`. The only server component is a small Node
+**sidecar** (`server/`) running inside the nginx container: it terminates the same-origin
+`/api/gemini/generate` proxy and calls **Vertex AI** with the Cloud Run service account
+(ADC) — no API key material anywhere.
 
 ## Technology stack
 
@@ -30,7 +34,12 @@ is stateless: no accounts, no database, no server-side sessions.
 - react-router 7 (`BrowserRouter` in `src/main.tsx`) — note: routing is effectively
   unused; navigation is view state in `src/App.tsx` (`'landing' | 'desk'`)
 - pdfjs-dist 4 (client-side PDF text-layer extraction)
-- Gemini Developer API (`gemini-3.8-flash`, JSON mode) via `fetch` — no SDK
+- Gemini (`gemini-3.8-flash`, JSON mode) via `fetch` — no SDK. In deployment the call
+  goes same-origin to the sidecar → **Vertex AI** (`global` endpoint — 3.8-flash is not
+  published in `asia-south1`); the BYOK override calls the Developer API browser-direct.
+- Sidecar (`server/`): Node 20 ESM, `google-auth-library` only, `node --test` specs in
+  `server/index.test.js`; started by `docker-entrypoint.d/40-sidecar.sh` inside the
+  nginx container, bound to 127.0.0.1:8081.
 - Declared in `package.json` but **not currently imported anywhere in `src/`**:
   `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`. Do not assume
   they are used; either use them deliberately or leave them alone.
@@ -81,6 +90,11 @@ src/
   data/samples.ts     three synthetic case files (all people/insurers fictional)
   sections/           Landing.tsx, Workbench.tsx (three-column desk UI)
   components/         kit.tsx (Kicker, NumberedSection, PanelTitle), ScoreStamp.tsx
+server/
+  index.js            sidecar routes: POST /generate → Vertex AI (ADC), GET /healthz
+  index.test.js       node --test specs (handler is dependency-injected: token + fetch)
+docker-entrypoint.d/  40-sidecar.sh starts the sidecar before nginx (official entrypoint)
+infra/                gcloud scripts per Phase 06 step (06-1-vertex.sh, …)
 ```
 
 Module conventions:
@@ -97,7 +111,7 @@ Module conventions:
 1. Workbench starts from `SAMPLE_CASES` (demo mode, zero setup) or user-uploaded files.
 2. Uploads: `pdf.ts` extracts text locally (text layer only — scanned PDFs yield nothing
    and the UI warns), text is truncated to 30,000 chars per file.
-3. `gemini.ts` sends the text to Gemini 2.5 Flash with a fixed JSON-shape prompt
+3. `gemini.ts` sends the text to Gemini `gemini-3.8-flash` with a fixed JSON-shape prompt
    (temperature 0, `responseMimeType: application/json` + a `responseSchema` from
    `schemas.ts`), validates the response with zod (`extractionSchema.safeParse`),
    retries once with the validation errors appended, and only then maps it to a
@@ -110,28 +124,33 @@ Gemini key resolution (`loadGeminiKey`): localStorage key `claimsahayak.geminiKe
 defaulting to the sentinel `'PROXY'`, which routes requests to the same-origin path
 `/api/gemini/generate` (see Deployment). A user-entered key is sent browser-direct to
 `generativelanguage.googleapis.com`. For local dev, the vite dev server runs the same
-proxy as middleware (`configureServer` in `vite.config.ts`), keyed by `GEMINI_API_KEY`
-in a local `.env` (see `.env.example`); without it the middleware answers HTTP 428
+proxy as middleware (`configureServer` in `vite.config.ts`) in two modes:
+`GEMINI_SIDECAR_URL` set → forward to a locally running sidecar (`npm run dev:server`,
+needs `gcloud auth application-default login`); otherwise keyed by `GEMINI_API_KEY` in a
+local `.env` (see `.env.example`). With neither set the middleware answers HTTP 428
 `{"error":"no_dev_key"}` and the app shows a friendly prompt. Never commit a real key;
 `.env*` is gitignored.
 
 ## Deployment
 
 - `Dockerfile`: two-stage build — `node:20-alpine` runs `npm ci && npm run build`, then
-  `nginx:1.27-alpine` serves `dist/`.
+  `nginx:1.27-alpine` + `apk nodejs` serves `dist/` and runs the sidecar (`server/`)
+  via `/docker-entrypoint.d/40-sidecar.sh`.
 - `nginx.conf.template` (envsubst'd into the nginx config): SPA fallback, security
   headers + CSP, static-asset caching, and a POST-only reverse proxy at
-  `/api/gemini/generate` → Gemini's `generateContent` endpoint with the key injected from
-  the `GEMINI_API_KEY` env var. The proxy is rate-limited (20 req/min per IP, burst 10,
-  4 MB body cap, JSON 429/502). The nginx CSP is tight (`script-src 'self'`, Google Fonts
-  for style/font, `connect-src 'self'` plus `generativelanguage.googleapis.com` for the
-  BYOK override) — if you add external resources, update the CSP.
+  `/api/gemini/generate` → the sidecar on `127.0.0.1:8081`, which calls Vertex AI's
+  `generateContent` with an ADC access token (model/location from `VERTEX_MODEL` /
+  `VERTEX_LOCATION`, project from `VERTEX_PROJECT`). The proxy is rate-limited
+  (20 req/min per IP, burst 10, 4 MB body cap, JSON 429/502). The nginx CSP is tight
+  (`script-src 'self'`, Google Fonts for style/font, `connect-src 'self'` plus
+  `generativelanguage.googleapis.com` for the BYOK override) — if you add external
+  resources, update the CSP.
 - CI/CD: `.github/workflows/deploy.yml` on push to `main` — Workload Identity Federation
   auth (no JSON keys), docker build/push to Artifact Registry (`asia-south1`), deploy to
-  Cloud Run service `claimsahayak` (project `claim-sahayak`), with
-  `GEMINI_API_KEY` bound from Secret Manager secret `gemini-api-key`.
-- The README's "production path" table describes an aspirational Vertex AI / Cloud Run
-  backend; what actually exists today is the nginx proxy above.
+  Cloud Run service `claimsahayak` (project `claim-sahayak`) with `VERTEX_*` env vars.
+  The runtime service account holds `roles/aiplatform.user` (see `infra/06-1-vertex.sh`).
+  Phase 06 step 6.1 retired the `GEMINI_API_KEY` Secret Manager binding; access is
+  IAM-governed with per-request audit in Cloud Logging.
 
 ## Code style guidelines
 
@@ -160,11 +179,13 @@ commit. The verification bar for any change:
 
 ## Security considerations
 
-- Never commit API keys or `.env` files. The only secret in deployment is
-  `GEMINI_API_KEY`, injected by Cloud Run from Secret Manager into nginx envsubst — it
-  must never be baked into client code or the image.
+- Never commit API keys or `.env` files. Production Gemini access uses the Cloud Run
+  service account (ADC) — there is no deployed API key to leak or rotate. A local
+  `GEMINI_API_KEY` is dev-only (gitignored `.env`).
 - The browser-direct Gemini path with a user-supplied key is a deliberate demo tradeoff;
   the key stays in the user's localStorage.
+- The sidecar binds 127.0.0.1 only; the only public surface is nginx. Keep it that way —
+  new `/api/*` routes go through the nginx proxy block with method restrictions.
 - Keep the nginx CSP/security headers in `nginx.conf.template` intact; expand
   `connect-src`/`script-src` only with a specific reason.
 - The app is an assistive analysis tool, not insurance/legal advice — preserve the

@@ -17,26 +17,30 @@ flowchart LR
         ENGINE --> HINDI --> UI
     end
 
-    subgraph cloudrun["Cloud Run — asia-south1 (single container)"]
+    subgraph cloudrun["Cloud Run — asia-south1 (single container, two processes)"]
         NGINX["nginx\nSPA static + security headers/CSP\nPOST-only proxy /api/gemini/generate\nrate limit 20 req/min/IP, 4 MB cap"]
+        SIDECAR["Node sidecar — server/\nVertex AI via ADC (service account)\nno API key material anywhere"]
+        NGINX -->|"127.0.0.1:8081/generate"| SIDECAR
     end
 
-    subgraph google["Google APIs"]
-        GEMINI["Gemini Developer API\ngemini-3.8-flash, JSON mode\nextraction ONLY — temperature 0,\nzod-validated response schema"]
+    subgraph google["Google Cloud"]
+        VERTEX["Vertex AI — Gemini\ngemini-3.8-flash, global endpoint, JSON mode\nextraction ONLY — temperature 0,\nzod-validated response schema"]
+        LOGS["Cloud Logging\nper-request audit (IAM-governed)"]
     end
 
     subgraph ci["Deploy pipeline (GitHub Actions)"]
         WIF["Workload Identity Federation\n(no JSON keys)"]
         AR["Artifact Registry\n(docker image)"]
-        SM["Secret Manager\ngemini-api-key"]
+        IAM["IAM: runtime SA\nroles/aiplatform.user"]
         WIF --> AR
     end
 
     UI -->|"POST /api/gemini/generate\n(same-origin, no key in browser)"| NGINX
-    NGINX -->|"key injected from env\n(never in client, never in logs)"| GEMINI
-    GEMINI -->|"structured JSON facts"| NGINX --> UI
+    SIDECAR -->|"ADC access token"| VERTEX
+    VERTEX -->|"structured JSON facts"| SIDECAR --> NGINX --> UI
+    SIDECAR -.-> LOGS
     UI -.->|"engine recomputes score,\nwaterfall, verdict from facts"| ENGINE
-    SM -.->|"env at deploy"| NGINX
+    IAM -.->|"granted by infra/06-1-vertex.sh"| SIDECAR
     AR -.->|deploy| cloudrun
 
     style ENGINE stroke-width:3px
@@ -48,19 +52,20 @@ flowchart LR
    network calls. Gemini's output is validated with zod and reduced to typed facts
    (`Policy`, `HospitalEpisode`, `BillLine`); every score, deduction and payout is
    recomputed from those facts by deterministic code covered by vitest.
-2. **Key boundary (in the container).** The managed Gemini key exists only as a
-   Secret Manager secret injected into nginx's environment at deploy time. It appears
-   in exactly one place — the `proxy_pass` directive — so it is never sent to the
-   browser, never in a URL the user can see, and never in access logs. A user-supplied
-   key (Settings → API key) is the deliberate demo override and stays in that browser's
-   localStorage.
+2. **Key boundary (removed).** Phase 06 step 6.1 eliminated the managed API key: the
+   sidecar authenticates to Vertex AI with the Cloud Run service account (Application
+   Default Credentials), so there is no key material in the container, the image, or the
+   client — access is IAM-governed and audited in Cloud Logging. A user-supplied key
+   (Settings → API key) remains as the deliberate demo override and stays in that
+   browser's localStorage.
 
 ## Request flow (upload path)
 
 1. Browser extracts PDF text locally with pdf.js (scanned PDFs yield nothing and the
-   UI says so — OCR is Phase 06).
+   UI says so — OCR is Phase 06 step 6.2).
 2. Browser POSTs the extraction prompt to the same-origin `/api/gemini/generate`.
-3. nginx rate-limits, caps body size, and forwards to Gemini with the key injected.
+3. nginx rate-limits, caps body size, and forwards to the sidecar (127.0.0.1:8081),
+   which calls Vertex AI with an ADC token.
 4. Gemini returns schema-constrained JSON; the browser validates it with zod (one
    retry with validation errors appended), then maps it to a `CaseFile`.
 5. The rules engine computes score, flags, waterfall, rejection class, grievance

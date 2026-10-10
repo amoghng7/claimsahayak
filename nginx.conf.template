@@ -32,13 +32,10 @@ server {
         # PDF text payloads are small; 4 MB is generous headroom
         client_max_body_size 4m;
 
-        resolver 8.8.8.8;
-        # Proxy strictly to the flash generateContent endpoint and inject the secret key.
-        # The key lives only in proxy_pass — never in $request_uri — so access
-        # logs cannot capture it. Request bodies are not logged.
-        proxy_pass https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY};
-        proxy_set_header Host generativelanguage.googleapis.com;
-        proxy_ssl_server_name on;
+        # Sidecar in the same container calls Vertex AI with the Cloud Run
+        # service account (ADC) — no API key material in this config at all.
+        proxy_pass http://127.0.0.1:8081/generate;
+        proxy_set_header Host $host;
 
         proxy_connect_timeout 10s;
         proxy_read_timeout 60s;

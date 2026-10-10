@@ -1,0 +1,17 @@
+{
+  "name": "claimsahayak-sidecar",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Same-origin backend for ClaimSahayak: Vertex AI Gemini proxy (ADC, no API key), plus Phase 06 endpoints. Runs inside the nginx container on Cloud Run.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "google-auth-library": "^9.15.0"
+  }
+}

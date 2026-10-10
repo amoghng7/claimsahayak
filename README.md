@@ -62,22 +62,24 @@ npm run build      # strict typecheck + production build → dist/
 ```
 
 Works out of the box in **demo mode** (three synthetic case files). To analyze your own
-documents, the app calls Gemini through a server-side proxy by default: in the deployed
-container, nginx forwards `POST /api/gemini/generate` to the Gemini API with the key
-injected from **Secret Manager** — no key ever touches the client. For local development
-the vite dev server runs the same proxy as middleware: set `GEMINI_API_KEY` in a local
-`.env` (see `.env.example`; without it the endpoint answers HTTP 428 and the app asks you
-for a key), or open **Settings → API key** and paste a Gemini API key (Google AI Studio →
-"Get API key") as a browser-direct override; that key is stored only in your browser's
-localStorage. The proxy endpoint is rate-limited to **20 requests/minute per client IP**
-(burst 10) with a 4 MB body cap, and answers with JSON 429/502 errors.
+documents, the app calls Gemini through a same-origin server-side proxy by default: in the
+deployed container, a small Node **sidecar** (`server/`) receives `POST
+/api/gemini/generate` from nginx and calls **Vertex AI** with the Cloud Run service
+account (Application Default Credentials) — no API key anywhere, access governed by IAM.
+For local development the vite dev server runs the same proxy as middleware, in one of
+two modes: set `GEMINI_SIDECAR_URL=http://localhost:8081` and run `npm run dev:server`
+in a second shell (production-shaped; needs `gcloud auth application-default login`), or
+set `GEMINI_API_KEY` in a local `.env` (see `.env.example`; with neither set the endpoint
+answers HTTP 428 and the app asks you for a key). You can also open **Settings → API
+key** and paste a Gemini API key (Google AI Studio → "Get API key") as a browser-direct
+override; that key is stored only in your browser's localStorage. The proxy endpoint is
+rate-limited to **20 requests/minute per client IP** (burst 10) with a 4 MB body cap,
+and answers with JSON 429/502 errors.
 
-To rotate the managed key in production:
-
-```bash
-gcloud secrets versions add gemini-api-key --data-file=-
-gcloud run services update claimsahayak --region=asia-south1   # pick up the new version
-```
+Model note: the app extracts with `gemini-3.8-flash`. That model is not published in
+Vertex's `asia-south1` location, so the sidecar calls Vertex's **global** endpoint
+(same model, same response contract); the location and model are env-configurable
+(`VERTEX_LOCATION`, `VERTEX_MODEL`).
 
 ## Verified against
 
@@ -96,16 +98,16 @@ prototype to submission-ready.
 
 ## Production path on Google Cloud
 
-Deployed, the SPA is served by nginx on **Cloud Run**, which also proxies Gemini calls
-(key from **Secret Manager**, never shipped to the browser). The longer-term production
-path upgrades that to:
+Deployed, the SPA is served by nginx on **Cloud Run**, with a Node sidecar in the same
+container proxying Gemini calls to **Vertex AI** via Application Default Credentials —
+no key material anywhere. Further hardening (Phase 06, `plan/06-production-backend.md`):
 
-| Concern | Demo (this repo) | Production |
+| Concern | This repo (post-6.1) | Next steps |
 |---|---|---|
-| Extraction | Gemini Developer API via nginx proxy | **Vertex AI** (Gemini 2.5) behind **Cloud Run**, key in **Secret Manager** |
-| Scanned PDFs | text-layer only | **Document AI** OCR pipeline |
-| Storage | none (stateless) | **Cloud Storage** (docs) + **Firestore** (case records) |
-| Rules engine | client-side TS | same code, server-side, versioned per regulation change |
+| Extraction | **Vertex AI** (Gemini) behind the Cloud Run sidecar, IAM-governed | per-request audit dashboards |
+| Scanned PDFs | text-layer only | **Document AI** OCR pipeline (6.2) |
+| Edge protection | nginx rate limit | **Cloud Armor** + budget/monitoring alerts (6.3) |
+| Storage | none (stateless) | consent-gated **Firestore** + **Cloud Storage** (6.4) |
 
 ## Repo layout
 
@@ -125,6 +127,8 @@ src/
   data/samples.ts  three synthetic case files (fictional people/insurers)
   sections/        Landing + Workbench (three-column analysis desk)
   components/      ScoreStamp (rotating verdict stamp), design-kit primitives
+server/
+  index.js         sidecar: /generate → Vertex AI via ADC (no API key), /healthz
 ```
 
 ## Notes

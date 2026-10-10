@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Phase 06 step 6.1 — Vertex AI cutover for ClaimSahayak.
+# Enables Vertex AI and grants the Cloud Run runtime service account access.
+# The deploy itself happens via .github/workflows/deploy.yml on push to main.
+# Idempotent — safe to re-run.
+set -euo pipefail
+
+PROJECT=claim-sahayak
+REGION=asia-south1
+RUNTIME_SA=599879020255-compute@developer.gserviceaccount.com
+
+gcloud services enable aiplatform.googleapis.com --project="$PROJECT"
+
+gcloud projects add-iam-policy-binding "$PROJECT" \
+  --member="serviceAccount:$RUNTIME_SA" \
+  --role="roles/aiplatform.user"
+
+echo "Done. Model config lives in deploy.yml env: VERTEX_LOCATION=global,"
+echo "VERTEX_MODEL=gemini-3.8-flash (3.8-flash is not published in $REGION;"
+echo "global endpoint verified live with a real generateContent call)."
+echo "After the new revision is verified, retire the old key:"
+echo "  gcloud secrets disable gemini-api-key --project=$PROJECT   # then delete when confident"

@@ -1,0 +1,2 @@
+# Shell scripts land in the Linux container — always LF, never CRLF
+*.sh text eol=lf

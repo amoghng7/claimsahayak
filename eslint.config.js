@@ -18,6 +18,18 @@ export default tseslint.config(
     },
   },
   {
+    // Node sidecar (ESM) — node globals, no DOM
+    files: ['server/**/*.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        fetch: 'readonly',
+      },
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     plugins: {
       'react-hooks': reactHooks,

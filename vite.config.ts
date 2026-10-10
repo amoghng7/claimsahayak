@@ -1,6 +1,7 @@
 import path from "path"
 import react from "@vitejs/plugin-react"
-import { defineConfig, loadEnv } from "vite"
+import { loadEnv } from "vite"
+import { defineConfig } from "vitest/config"
 import type { Connect, Plugin } from "vite"
 
 // Optional platform plugin (present in the original build sandbox, not on npm).
@@ -26,9 +27,11 @@ function readBody(req: Connect.IncomingMessage): Promise<string> {
 }
 
 // Dev parity for the nginx proxy in nginx.conf.template: same path, same
-// upstream, key injected server-side. Without a key we answer 428 so the app
-// can show a friendly message instead of parsing the SPA fallback HTML.
-function geminiDevProxy(apiKey: string | undefined): Plugin {
+// contract. Two modes: GEMINI_SIDECAR_URL set → forward to a locally running
+// sidecar (npm run dev:server, production-shaped); otherwise inject a dev key
+// server-side like the pre-Vertex nginx proxy did. Without a key we answer 428
+// so the app can show a friendly message instead of parsing the SPA fallback HTML.
+function geminiDevProxy(apiKey: string | undefined, sidecarUrl: string | undefined): Plugin {
   return {
     name: 'gemini-dev-proxy',
     configureServer(server) {
@@ -39,17 +42,19 @@ function geminiDevProxy(apiKey: string | undefined): Plugin {
           res.end(JSON.stringify({ error: 'method_not_allowed' }))
           return
         }
-        if (!apiKey) {
+        if (!apiKey && !sidecarUrl) {
           res.statusCode = 428
           res.end(JSON.stringify({ error: 'no_dev_key' }))
           return
         }
         try {
           const body = await readBody(req)
-          const upstream = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
-          )
+          const upstream = sidecarUrl
+            ? await fetch(`${sidecarUrl}/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+            : await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey!)}`,
+                { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
+              )
           res.statusCode = upstream.status
           res.end(await upstream.text())
         } catch {
@@ -66,7 +71,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
     base: '/',
-    plugins: [...inspectPlugin, react(), geminiDevProxy(env.GEMINI_API_KEY)],
+    plugins: [...inspectPlugin, react(), geminiDevProxy(env.GEMINI_API_KEY, env.GEMINI_SIDECAR_URL)],
     server: {
       port: 3000,
     },
@@ -74,6 +79,10 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+    },
+    test: {
+      // server/ has its own node --test suite (npm --prefix server test)
+      exclude: ['**/node_modules/**', '**/dist/**', 'server/**'],
     },
   }
 });

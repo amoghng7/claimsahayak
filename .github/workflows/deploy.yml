@@ -76,7 +76,7 @@ jobs:
             --cpu=1 \
             --min-instances=0 \
             --max-instances=3 \
-            --set-secrets="GEMINI_API_KEY=gemini-api-key:latest" \
+            --set-env-vars="VERTEX_PROJECT=${{ env.PROJECT_ID }},VERTEX_LOCATION=global,VERTEX_MODEL=gemini-3.8-flash" \
             --project=${{ env.PROJECT_ID }}
 
       - name: Show deployment URL
