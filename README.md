@@ -33,12 +33,17 @@ in the same reduced ratio. On a ₹4.2 lakh surgery that single choice quietly r
 7. **Rejection desk** — paste a repudiation letter; the desk classifies the ground
    (non-disclosure, waiting period, deficiency, delay, sub-limit, exclusion), judges whether
    it is reversible (e.g. the 5-year moratorium in IRDAI's 2024 regulations), and lists the
-   counter-steps.
+   counter-steps. When the letter matches no known pattern, a Gemini fallback classifier
+   (zod-validated, confidence-gated, clearly labelled "AI assistance") takes over — and a
+   dated escalation ladder shows the GRO, Bima Bharosa and Ombudsman deadlines computed
+   from the rejection date.
 8. **Grievance letter** — drafted deterministically from the case record, with the regulation
-   cited clause-by-clause and the escalation route (grievance cell → Bima Bharosa → Insurance
-   Ombudsman).
+   cited clause-by-clause, a 14-day reply deadline computed from the rejection date, and the
+   escalation route (grievance cell → Bima Bharosa → Insurance Ombudsman). Filing-ready:
+   "Print / Save as PDF" renders it as a clean A4 document.
 9. **हिंदी सारांश** — every verdict closes with a plain Hindi summary, because the claim is
-   usually managed by family, not policy nerds.
+   usually managed by family, not policy nerds. The rejection desk gets its own experimental
+   Hindi summary (सरल हिंदी सारांश — प्रायोगिक).
 
 ## Design principle: arithmetic, not opinion. Words, grounded.
 
@@ -110,7 +115,8 @@ src/
     types.ts       domain model (policy, episode, bill lines, case file)
     rules.ts       deterministic rules: score, missing docs, room-rent math,
                    waiting periods, payable waterfall, rejection classifier
-    grievance.ts   grievance-letter drafter (template + cited clauses)
+    rejection.ts   Gemini fallback classifier (regex stays primary) + rejection-date parse
+    grievance.ts   grievance-letter drafter + dated escalation ladder (template + cited clauses)
     hindi.ts       Hindi verdict summary (template-driven)
     gemini.ts      live extraction via Gemini (nginx proxy by default, BYOK override)
     schemas.ts     zod schemas + responseSchema constraining Gemini's output

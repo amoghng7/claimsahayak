@@ -69,13 +69,15 @@ src/
     types.ts          domain model: Policy, HospitalEpisode, BillLine, CaseFile
     rules.ts          deterministic engine: document checklist, room-rent math,
                       waiting periods, payable waterfall, score, rejection classifier
-    grievance.ts      grievance-letter drafter (template + cited clauses)
-    hindi.ts          Hindi verdict summary (template-driven)
+    rejection.ts      Gemini fallback rejection classifier (regex stays primary,
+                      zod-validated, confidence-gated) + rejection-date parsing
+    grievance.ts      grievance-letter drafter + dated escalation ladder (template + cited clauses)
+    hindi.ts          Hindi verdict + rejection summaries (template-driven)
     gemini.ts         Gemini extraction call (zod-validated, one retry) + API-key helpers
     schemas.ts        zod schemas + responseSchema constraining Gemini's output
     pdf.ts            pdf.js text-layer extraction
     format.ts         ₹ Indian-format / date helpers (en-IN locale)
-    __tests__/        vitest specs for rules, grievance, hindi, gemini
+    __tests__/        vitest specs for rules, rejection, grievance, hindi, gemini
   data/samples.ts     three synthetic case files (all people/insurers fictional)
   sections/           Landing.tsx, Workbench.tsx (three-column desk UI)
   components/         kit.tsx (Kicker, NumberedSection, PanelTitle), ScoreStamp.tsx
@@ -147,7 +149,7 @@ in a local `.env` (see `.env.example`); without it the middleware answers HTTP 4
 ## Testing
 
 The deterministic engine is covered by a vitest suite in `src/engine/__tests__/`
-(`rules`, `grievance`, `hindi`, `gemini`), including the three bundled sample cases'
+(`rules`, `rejection`, `grievance`, `hindi`, `gemini`), including the three bundled sample cases'
 documented scores and payouts. Every engine change ships with assertions in the same
 commit. The verification bar for any change:
 
