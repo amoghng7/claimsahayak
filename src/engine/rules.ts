@@ -421,8 +421,8 @@ export function analyzeRejection(c: CaseFile, letter: string): RejectionVerdict 
     steps: [
       'Demand the exact policy clause and computation relied upon, in writing.',
       'Prepare a point-by-point written rebuttal with documents annexed.',
-      'Escalate to the insurer\'s Grievance Cell; then Bima Bharosa / Insurance Ombudsman if unresolved in 15 days.',
+      'Escalate to the insurer\'s Grievance Cell; then Bima Bharosa / Insurance Ombudsman if unresolved in 14 days.',
     ],
-    clauses: ['IRDAI PPHI Regulations 2024 — grievance redressal timelines (15 days) and escalation route.'],
+    clauses: ['IRDAI PPI Master Circular 2024 — grievance redressal timelines (14 days) and escalation route.'],
   }
 }
