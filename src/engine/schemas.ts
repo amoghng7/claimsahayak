@@ -19,6 +19,11 @@ export const subLimitSchema = z.object({
   value: z.number().nonnegative(),
 })
 
+export const exclusionSchema = z.object({
+  label: z.string(),
+  match: z.array(z.string()),
+})
+
 export const policySchema = z.object({
   insurer: z.string(),
   product: z.string(),
@@ -32,7 +37,7 @@ export const policySchema = z.object({
   pedsDeclared: z.array(z.string()),
   specificWaitingYears: z.number().nonnegative(),
   specificDiseases: z.array(z.string()),
-  exclusions: z.array(z.string()),
+  exclusions: z.array(exclusionSchema),
   subLimits: z.array(subLimitSchema),
 })
 
@@ -102,7 +107,17 @@ export const EXTRACTION_RESPONSE_SCHEMA = {
         pedsDeclared: { type: 'ARRAY', items: { type: 'STRING' } },
         specificWaitingYears: { type: 'NUMBER' },
         specificDiseases: { type: 'ARRAY', items: { type: 'STRING' } },
-        exclusions: { type: 'ARRAY', items: { type: 'STRING' } },
+        exclusions: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              label: { type: 'STRING' },
+              match: { type: 'ARRAY', items: { type: 'STRING' } },
+            },
+            required: ['label', 'match'],
+          },
+        },
         subLimits: {
           type: 'ARRAY',
           items: {

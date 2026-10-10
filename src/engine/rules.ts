@@ -1,4 +1,4 @@
-import type { BillLine, CaseFile, HospitalEpisode, Policy } from './types'
+import type { BillLine, CaseFile, HospitalEpisode, Policy, PolicyExclusion } from './types'
 import { addMonths, daysBetween, formatDate, monthsBetween, yearsBetween } from './format'
 
 /* ------------------------------------------------------------------ */
@@ -84,19 +84,23 @@ export function roomRentAnalysis(
   omit?: (l: BillLine) => boolean,
 ): RoomRentAnalysis | null {
   const allowed = allowedRoomRent(policy)
-  if (allowed === null || ep.roomRentPerDay <= allowed) return null
-  const ratio = allowed / ep.roomRentPerDay
-  const roomLines = ep.billLines.filter((l) => l.isRoomRent)
-  const roomCut =
-    roomLines.length > 0
-      ? roomLines
-          .filter((l) => !isIcuLine(l) && !omit?.(l))
-          .reduce((sum, l) => sum + l.amount * (1 - ratio), 0)
-      : (ep.roomRentPerDay - allowed) * ep.roomDays
+  if (allowed === null) return null
+  // The bill's room lines are the source of truth for the actual rent (the
+  // ledger lets users correct them); episode fields are the fallback for
+  // bills with no room line at all.
+  const roomLines = ep.billLines.filter((l) => l.isRoomRent && !omit?.(l))
+  const nonIcuRoom = roomLines.filter((l) => !isIcuLine(l))
+  const actual =
+    nonIcuRoom.length > 0
+      ? nonIcuRoom.reduce((s, l) => s + l.amount, 0) / (ep.roomDays || 1)
+      : ep.roomRentPerDay
+  if (actual <= allowed) return null
+  const ratio = allowed / actual
+  const roomCut = nonIcuRoom.reduce((sum, l) => sum + l.amount * (1 - ratio), 0)
   const proportionalCut = ep.billLines
     .filter((l) => l.roomLinked && !l.isRoomRent && !isIcuLine(l) && !omit?.(l))
     .reduce((sum, l) => sum + l.amount * (1 - ratio), 0)
-  return { allowed, actual: ep.roomRentPerDay, ratio, roomCut, proportionalCut }
+  return { allowed, actual, ratio, roomCut, proportionalCut }
 }
 
 /* ------------------------------------------------------------------ */
@@ -118,7 +122,7 @@ function containsKeyword(text: string, keyword: string): boolean {
 /* ------------------------------------------------------------------ */
 
 export interface ExclusionCheck {
-  /** exclusion clauses matched against the diagnosis / procedure */
+  /** exclusion clause labels matched against the diagnosis / procedure */
   hits: string[]
   /** bill lines whose head matches an exclusion clause */
   excludedLines: BillLine[]
@@ -126,10 +130,13 @@ export interface ExclusionCheck {
 }
 
 export function exclusionCheck(policy: Policy, ep: HospitalEpisode): ExclusionCheck {
+  const keywordsOf = (e: PolicyExclusion) => [e.label, ...e.match]
   const treatmentText = `${ep.diagnosis} ${ep.procedure}`
-  const hits = policy.exclusions.filter((e) => containsKeyword(treatmentText, e))
+  const hits = policy.exclusions
+    .filter((e) => keywordsOf(e).some((k) => containsKeyword(treatmentText, k)))
+    .map((e) => e.label)
   const excludedLines = ep.billLines.filter((l) =>
-    policy.exclusions.some((e) => containsKeyword(l.head, e)),
+    policy.exclusions.some((e) => keywordsOf(e).some((k) => containsKeyword(l.head, k))),
   )
   return {
     hits,
@@ -281,7 +288,10 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
   const roomCut = rr?.roomCut ?? 0
   const proportionalCut = rr?.proportionalCut ?? 0
   const exclusionCut = excl.excludedAmount
-  const pedCut = ped.excludedAmount
+  // A line hit by both a permanent exclusion and a PED breach is cut once.
+  const pedCut = ped.excludedLines
+    .filter((l) => !excl.excludedLines.includes(l))
+    .reduce((s, l) => s + l.amount, 0)
 
   // Named sub-limits cap the (post-proportional) sum of their matched lines.
   const subLimitCuts: SubLimitCut[] = []

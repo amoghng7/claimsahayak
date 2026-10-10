@@ -251,13 +251,13 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
           </PanelTitle>
           <div className="border border-line">
             {c.policy.exclusions.map((e, i) => {
-              const hit = v.exclusions.hits.includes(e)
+              const hit = v.exclusions.hits.includes(e.label)
               return (
                 <div
                   key={i}
                   className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line-faint last:border-0"
                 >
-                  <span className="text-[13px]">{e}</span>
+                  <span className="text-[13px]">{e.label}</span>
                   {hit && (
                     <span className="font-mono text-[10px] uppercase tracking-wider text-crimson">
                       matches this treatment

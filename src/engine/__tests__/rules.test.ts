@@ -163,22 +163,55 @@ describe('waitingPeriodCheck', () => {
 
 describe('exclusionCheck — permanent exclusions (AUD-11)', () => {
   it('matches the episode diagnosis/procedure against the exclusion list, case-insensitive', () => {
-    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery'] }) })
+    const c = makeCase({
+      policy: makePolicy({ exclusions: [{ label: 'Cosmetic surgery', match: ['cosmetic', 'aesthetic', 'rhinoplasty'] }] }),
+    })
     c.episode.diagnosis = 'Rhinoplasty — COSMETIC SURGERY'
     c.episode.procedure = 'Cosmetic surgery — rhinoplasty'
     const chk = exclusionCheck(c.policy, c.episode)
     expect(chk.hits).toContain('Cosmetic surgery')
   })
 
+  it('fires on real-world wording — "Dental abscess" under a dental exclusion, no verbatim clause needed', () => {
+    const c = makeCase({
+      policy: makePolicy({ exclusions: [{ label: 'Dental treatment unless accidental', match: ['dental'] }] }),
+    })
+    c.episode.diagnosis = 'Dental abscess'
+    c.episode.procedure = 'Extraction'
+    expect(exclusionCheck(c.policy, c.episode).hits).toContain('Dental treatment unless accidental')
+  })
+
+  it('keyword variants fire — a rhinoplasty bill under a cosmetic-surgery exclusion', () => {
+    const c = makeCase({
+      policy: makePolicy({ exclusions: [{ label: 'Cosmetic or aesthetic surgery', match: ['cosmetic', 'aesthetic', 'rhinoplasty'] }] }),
+    })
+    c.episode.diagnosis = 'Nasal deformity'
+    c.episode.procedure = 'Rhinoplasty'
+    const chk = exclusionCheck(c.policy, c.episode)
+    expect(chk.hits).toContain('Cosmetic or aesthetic surgery')
+  })
+
   it('respects word boundaries — "Hernia" does not match "Herniated disc"', () => {
-    const c = makeCase({ policy: makePolicy({ exclusions: ['Hernia'] }) })
+    const c = makeCase({ policy: makePolicy({ exclusions: [{ label: 'Hernia', match: [] }] }) })
     c.episode.diagnosis = 'Herniated disc prolapse'
     c.episode.procedure = 'Discectomy'
     expect(exclusionCheck(c.policy, c.episode).hits).toHaveLength(0)
   })
 
+  it('does not fire on generic clause words when nothing specific matches', () => {
+    // "accidental" in the diagnosis must not fire the dental exclusion
+    const c = makeCase({
+      policy: makePolicy({ exclusions: [{ label: 'Dental treatment unless accidental', match: ['dental'] }] }),
+    })
+    c.episode.diagnosis = 'Fracture of neck of femur after accidental fall'
+    c.episode.procedure = 'ORIF'
+    expect(exclusionCheck(c.policy, c.episode).hits).toHaveLength(0)
+  })
+
   it('excludes matching bill lines from the payable estimate', () => {
-    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery'] }) })
+    const c = makeCase({
+      policy: makePolicy({ exclusions: [{ label: 'Cosmetic surgery', match: ['cosmetic', 'rhinoplasty'] }] }),
+    })
     c.episode.diagnosis = 'Cosmetic surgery — rhinoplasty'
     c.episode.billLines = [
       { head: 'Room & nursing charges', amount: 12000, roomLinked: false, isRoomRent: true },
@@ -195,8 +228,31 @@ describe('exclusionCheck — permanent exclusions (AUD-11)', () => {
     expect(p.expected).toBe(20000)
   })
 
+  it('a line matched by both a permanent exclusion and a PED breach is cut exactly once', () => {
+    const c = makeCase({
+      policy: makePolicy({
+        inceptionDate: '2025-04-01',
+        exclusions: [{ label: 'Bronchial asthma', match: ['asthma'] }],
+        pedsDeclared: ['Asthma'],
+      }),
+    })
+    c.episode.admissionDate = '2026-06-01' // month 14 → PED breach
+    c.episode.diagnosis = 'Acute asthma exacerbation'
+    c.episode.billLines = [
+      { head: 'Room & nursing charges', amount: 12000, roomLinked: false, isRoomRent: true },
+      { head: 'Asthma management charges', amount: 5000, roomLinked: false },
+      { head: 'Medicines', amount: 8000, roomLinked: false },
+    ]
+    c.episode.totalBill = 25000
+    const p = estimatePayable(c)
+    expect(p.exclusionCut + p.pedCut).toBe(5000)
+    expect(p.expected).toBe(20000)
+  })
+
   it('buildVerdict raises a crimson exclusion flag', () => {
-    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery'] }) })
+    const c = makeCase({
+      policy: makePolicy({ exclusions: [{ label: 'Cosmetic surgery', match: ['cosmetic', 'rhinoplasty'] }] }),
+    })
     c.episode.diagnosis = 'Cosmetic surgery — rhinoplasty'
     const v = buildVerdict(c)
     const flag = v.flags.find((f) => f.kind === 'exclusion')
@@ -206,7 +262,14 @@ describe('exclusionCheck — permanent exclusions (AUD-11)', () => {
   })
 
   it('clean policy: no hits, no excluded lines, zero exclusion cut', () => {
-    const c = makeCase({ policy: makePolicy({ exclusions: ['Cosmetic surgery', 'Dental treatment'] }) })
+    const c = makeCase({
+      policy: makePolicy({
+        exclusions: [
+          { label: 'Cosmetic surgery', match: ['cosmetic'] },
+          { label: 'Dental treatment', match: ['dental'] },
+        ],
+      }),
+    })
     const chk = exclusionCheck(c.policy, c.episode)
     expect(chk.hits).toHaveLength(0)
     expect(chk.excludedAmount).toBe(0)
@@ -400,6 +463,33 @@ describe('sub-limits beyond room rent + ICU nuance (AUD-13)', () => {
     const rr = roomRentAnalysis(c.policy, c.episode)!
     expect(rr.roomCut).toBe(0)
     expect(rr.proportionalCut).toBe(10000)
+  })
+
+  it('an edited room line within the cap clears the trap even if episode fields disagree', () => {
+    // Extraction read ₹8,000/day into the episode fields, but the user corrects
+    // the room line to ₹20,000 over 4 days = ₹5,000/day = the cap.
+    const c = makeCase({ policy: makePolicy({ roomRent: { type: 'daily_cap', value: 5000 } }) })
+    c.episode.roomRentPerDay = 8000
+    c.episode.roomDays = 4
+    c.episode.billLines = [
+      { head: 'Room & nursing charges', amount: 20000, roomLinked: false, isRoomRent: true },
+      { head: 'Surgeon fees', amount: 20000, roomLinked: true },
+    ]
+    c.episode.totalBill = 40000
+    expect(roomRentAnalysis(c.policy, c.episode)).toBeNull()
+    expect(estimatePayable(c).expected).toBe(40000)
+  })
+
+  it('deleting the room line removes the room cut but keeps the proportional deduction', () => {
+    const c = makeCase({ policy: makePolicy({ roomRent: { type: 'daily_cap', value: 5000 } }) })
+    c.episode.roomRentPerDay = 8000
+    c.episode.roomDays = 4
+    c.episode.billLines = [{ head: 'Surgeon fees', amount: 20000, roomLinked: true }]
+    c.episode.totalBill = 20000
+    const rr = roomRentAnalysis(c.policy, c.episode)!
+    // no room charge in the bill → nothing to cut; the ratio still applies to linked heads
+    expect(rr.roomCut).toBe(0)
+    expect(rr.proportionalCut).toBe(7500) // 20000 × (1 − 5000/8000)
   })
 })
 

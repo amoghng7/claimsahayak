@@ -24,7 +24,7 @@ const VALID_PAYLOAD = {
     pedsDeclared: ['Diabetes'],
     specificWaitingYears: 2,
     specificDiseases: ['Cataract'],
-    exclusions: ['Cosmetic surgery'],
+    exclusions: [{ label: 'Cosmetic surgery', match: ['cosmetic', 'rhinoplasty'] }],
     subLimits: [],
   },
   episode: {

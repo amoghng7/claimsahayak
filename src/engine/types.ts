@@ -16,6 +16,17 @@ export interface SubLimit {
   value: number
 }
 
+/**
+ * A permanent exclusion clause. `label` is the schedule wording (displayed);
+ * `match` holds lay/clinical keyword variants (e.g. "rhinoplasty" for a
+ * cosmetic-surgery exclusion) so matching works on real diagnoses, not just
+ * on the clause quoted verbatim.
+ */
+export interface PolicyExclusion {
+  label: string
+  match: string[]
+}
+
 export interface Policy {
   insurer: string
   product: string
@@ -32,7 +43,7 @@ export interface Policy {
   specificWaitingYears: number
   specificDiseases: string[]
   /** permanent exclusions as printed in the policy schedule */
-  exclusions: string[]
+  exclusions: PolicyExclusion[]
   /** named sub-limits beyond room rent (cataract caps, modern treatments…) */
   subLimits: SubLimit[]
 }
