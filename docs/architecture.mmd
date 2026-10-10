@@ -1,0 +1,35 @@
+flowchart LR
+    subgraph browser["Browser (client-side SPA — React 19 + Vite)"]
+        UI["Workbench UI\n(three-column claims desk)"]
+        PDF["pdf.js text-layer extraction\n(local — documents never leave the browser)"]
+        ENGINE["Rules engine — src/engine/rules.ts\nDETERMINISTIC: score, room-rent math,\nwaterfall, rejection classifier\nNO AI"]
+        HINDI["Hindi summary +\ngrievance drafter\n(templates)"]
+        UI --> PDF
+        PDF -->|"raw text (≤30k chars)"| UI
+        UI --> ENGINE
+        ENGINE --> HINDI --> UI
+    end
+
+    subgraph cloudrun["Cloud Run — asia-south1 (single container)"]
+        NGINX["nginx\nSPA static + security headers/CSP\nPOST-only proxy /api/gemini/generate\nrate limit 20 req/min/IP, 4 MB cap"]
+    end
+
+    subgraph google["Google APIs"]
+        GEMINI["Gemini Developer API\ngemini-3.8-flash, JSON mode\nextraction ONLY — temperature 0,\nzod-validated response schema"]
+    end
+
+    subgraph ci["Deploy pipeline (GitHub Actions)"]
+        WIF["Workload Identity Federation\n(no JSON keys)"]
+        AR["Artifact Registry\n(docker image)"]
+        SM["Secret Manager\ngemini-api-key"]
+        WIF --> AR
+    end
+
+    UI -->|"POST /api/gemini/generate\n(same-origin, no key in browser)"| NGINX
+    NGINX -->|"key injected from env\n(never in client, never in logs)"| GEMINI
+    GEMINI -->|"structured JSON facts"| NGINX --> UI
+    UI -.->|"engine recomputes score,\nwaterfall, verdict from facts"| ENGINE
+    SM -.->|"env at deploy"| NGINX
+    AR -.->|deploy| cloudrun
+
+    style ENGINE stroke-width:3px
