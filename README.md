@@ -20,18 +20,24 @@ in the same reduced ratio. On a ₹4.2 lakh surgery that single choice quietly r
 2. **Claim-readiness score (0–100)** — with explicit reasons, never just a number.
 3. **Document checklist** vs the IRDAI-standard hospitalisation claim list — mandatory gaps
    flagged with *why each document exists*.
-4. **Deduction traps** — room-rent sub-limit breach, proportional deduction on linked charges,
-   co-pay, non-payable consumables, waiting-period breaches — each priced to the rupee and
-   cited to the clause it stands on.
-5. **Expected-settlement waterfall** — total billed → each deduction → expected payout.
-6. **Rejection desk** — paste a repudiation letter; the desk classifies the ground
+4. **Deduction traps** — room-rent sub-limit breach, proportional deduction on linked charges
+   (ICU charges exempt, per IRDAI convention), named sub-limits (cataract caps, modern
+   treatments), permanent exclusions keyword-matched to the diagnosis, PED waiting-period
+   breaches against the 36-month IRDAI cap, co-pay, non-payable consumables — each priced to
+   the rupee and cited to the clause it stands on.
+5. **Expected-settlement waterfall** — total billed → each deduction (including every applied
+   sub-limit cap as its own row) → expected payout.
+6. **Editable bill lines** — extraction mistakes are correctable: edit amounts, toggle
+   room-linked/non-payable, add or delete rows; the verdict, waterfall and Hindi summary
+   recompute instantly through the same engine, and one click resets to the extracted values.
+7. **Rejection desk** — paste a repudiation letter; the desk classifies the ground
    (non-disclosure, waiting period, deficiency, delay, sub-limit, exclusion), judges whether
    it is reversible (e.g. the 5-year moratorium in IRDAI's 2024 regulations), and lists the
    counter-steps.
-7. **Grievance letter** — drafted deterministically from the case record, with the regulation
+8. **Grievance letter** — drafted deterministically from the case record, with the regulation
    cited clause-by-clause and the escalation route (grievance cell → Bima Bharosa → Insurance
    Ombudsman).
-8. **हिंदी सारांश** — every verdict closes with a plain Hindi summary, because the claim is
+9. **हिंदी सारांश** — every verdict closes with a plain Hindi summary, because the claim is
    usually managed by family, not policy nerds.
 
 ## Design principle: arithmetic, not opinion. Words, grounded.
