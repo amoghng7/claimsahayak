@@ -44,22 +44,45 @@ into structured facts. A model can read your documents; it is never allowed to i
 ## Run it
 
 ```bash
-npm install        # regenerates the lockfile (not committed — see below)
+npm install        # package-lock.json is committed; npm ci works too
 npm run dev        # http://localhost:3000
-npm run build      # production build → dist/
+npm run test       # vitest — rules engine, grievance letter, Hindi summary
+npm run build      # strict typecheck + production build → dist/
 ```
 
 Works out of the box in **demo mode** (three synthetic case files). To analyze your own
-documents, open **Settings → API key** in the app and paste a Gemini API key
-(Google AI Studio → “Get API key”). The key is stored only in your browser's localStorage.
+documents, the app calls Gemini through a server-side proxy by default: in the deployed
+container, nginx forwards `POST /api/gemini/generate` to the Gemini API with the key
+injected from **Secret Manager** — no key ever touches the client. For local development,
+set `VITE_GEMINI_API_KEY` in a local `.env`, or open **Settings → API key** and paste a
+Gemini API key (Google AI Studio → "Get API key") as a browser-direct override; that key
+is stored only in your browser's localStorage. See `plan/02-proxy-coherence.md` for the
+dev-proxy setup.
+
+## Verified against
+
+Regulatory copy and engine constants are checked against, and cite:
+
+- **IRDAI Master Circular on Health Insurance Business**, Ref. IRDAI/HLT/CIR/PRO/84/5/2024
+  (29 May 2024) — 30-day free-look, 5-year moratorium, 36-month PED waiting cap.
+- **Insurance Ombudsman Rules, 2017**, as amended by G.S.R. 828(E) (9 Nov 2023) — ₹50 lakh
+  compensation ceiling, 30-day award compliance, escalation route.
+
+## Roadmap
+
+The `plan/` folder holds the phased implementation plan (current-state audit, per-phase
+tasks with acceptance criteria, verified regulatory research notes) taking this repo from
+prototype to submission-ready.
 
 ## Production path on Google Cloud
 
-The browser-direct Gemini call in `src/engine/gemini.ts` is the demo path. For production:
+Deployed, the SPA is served by nginx on **Cloud Run**, which also proxies Gemini calls
+(key from **Secret Manager**, never shipped to the browser). The longer-term production
+path upgrades that to:
 
 | Concern | Demo (this repo) | Production |
 |---|---|---|
-| Extraction | Gemini Developer API, browser-direct | **Vertex AI** (Gemini 2.5) behind **Cloud Run**, key in **Secret Manager** |
+| Extraction | Gemini Developer API via nginx proxy | **Vertex AI** (Gemini 2.5) behind **Cloud Run**, key in **Secret Manager** |
 | Scanned PDFs | text-layer only | **Document AI** OCR pipeline |
 | Storage | none (stateless) | **Cloud Storage** (docs) + **Firestore** (case records) |
 | Rules engine | client-side TS | same code, server-side, versioned per regulation change |
@@ -74,7 +97,8 @@ src/
                    waiting periods, payable waterfall, rejection classifier
     grievance.ts   grievance-letter drafter (template + cited clauses)
     hindi.ts       Hindi verdict summary (template-driven)
-    gemini.ts      live extraction via Gemini (optional, user-supplied key)
+    gemini.ts      live extraction via Gemini (nginx proxy by default, BYOK override)
+    schemas.ts     zod schemas + responseSchema constraining Gemini's output
     pdf.ts         client-side PDF text extraction (pdf.js)
     format.ts      ₹ Indian-format helpers
   data/samples.ts  three synthetic case files (fictional people/insurers)
@@ -84,8 +108,6 @@ src/
 
 ## Notes
 
-- `package-lock.json` is intentionally not committed in this prototype push; `npm install`
-  regenerates it. Dependencies are pinned to caret ranges in `package.json`.
 - All sample people, hospitals, insurers and policy numbers are **fictional**.
 - This is an assistive analysis tool — **not insurance or legal advice**. The insurer's
   computation is final; the point is to know the number before they tell you.

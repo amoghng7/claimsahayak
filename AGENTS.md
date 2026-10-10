@@ -1,8 +1,7 @@
 # AGENTS.md — ClaimSahayak
 
 Guidance for AI coding agents working in this repository. Everything below reflects the
-actual state of the code — when this file and the README disagree, trust this file (the
-README is stale in a few places, called out below).
+actual state of the code — when this file and the README disagree, trust this file.
 
 ## Project overview
 
@@ -32,7 +31,7 @@ is stateless: no accounts, no database, no server-side sessions.
   unused; navigation is view state in `src/App.tsx` (`'landing' | 'desk'`)
 - pdfjs-dist 4 (client-side PDF text-layer extraction)
 - Gemini Developer API (`gemini-2.5-flash`, JSON mode) via `fetch` — no SDK
-- Declared in `package.json` but **not currently imported anywhere in `src/`**: `zod`,
+- Declared in `package.json` but **not currently imported anywhere in `src/`**:
   `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`. Do not assume
   they are used; either use them deliberately or leave them alone.
 - Path alias `@/*` → `./src/*` (configured in both `tsconfig*.json` and `vite.config.ts`)
@@ -42,18 +41,19 @@ is stateless: no accounts, no database, no server-side sessions.
 ```bash
 npm install        # install deps
 npm run dev        # dev server on http://localhost:3000 (port set in vite.config.ts)
-npm run build      # tsc -b && vite build → dist/  (this is the real "does it pass" check)
+npm run test       # vitest run — engine specs in src/engine/__tests__/
+npm run lint       # eslint 9+ flat config (eslint.config.js)
+npm run build      # tsc -b && vite build → dist/
 npm run preview    # serve the production build locally
 ```
 
 Notes:
 
-- `package-lock.json` **is committed** (the README's claim that it is not is stale).
-- `npm run lint` exists in `package.json` scripts but **eslint is not installed and there
-  is no eslint config** — the script fails. Do not treat it as a working check; use
-  `npm run build` (which runs `tsc -b` with strict settings) as the verification gate.
-- There is **no test suite** and no test runner configured. Verification = `npm run build`
-  passing plus manually exercising the app (sample cases work with no API key).
+- `package-lock.json` **is committed** — `npm ci` works.
+- The verification gate is: `npm run test`, `npm run lint`, `npx tsc --noEmit -p
+  tsconfig.app.json`, `npm run build` — all must pass. The deploy workflow
+  (`.github/workflows/deploy.yml`) runs `npm ci`, tests and typecheck before the
+  Docker build.
 - `vite.config.ts` dynamically imports an optional plugin `kimi-plugin-inspect-react`
   inside try/catch — it is not on npm and is absent outside the original build sandbox.
   Keep the try/catch intact.
@@ -71,9 +71,11 @@ src/
                       waiting periods, payable waterfall, score, rejection classifier
     grievance.ts      grievance-letter drafter (template + cited clauses)
     hindi.ts          Hindi verdict summary (template-driven)
-    gemini.ts         Gemini extraction call + API-key localStorage helpers
+    gemini.ts         Gemini extraction call (zod-validated, one retry) + API-key helpers
+    schemas.ts        zod schemas + responseSchema constraining Gemini's output
     pdf.ts            pdf.js text-layer extraction
     format.ts         ₹ Indian-format / date helpers (en-IN locale)
+    __tests__/        vitest specs for rules, grievance, hindi, gemini
   data/samples.ts     three synthetic case files (all people/insurers fictional)
   sections/           Landing.tsx, Workbench.tsx (three-column desk UI)
   components/         kit.tsx (Kicker, NumberedSection, PanelTitle), ScoreStamp.tsx
@@ -94,7 +96,9 @@ Module conventions:
 2. Uploads: `pdf.ts` extracts text locally (text layer only — scanned PDFs yield nothing
    and the UI warns), text is truncated to 30,000 chars per file.
 3. `gemini.ts` sends the text to Gemini 2.5 Flash with a fixed JSON-shape prompt
-   (temperature 0, `responseMimeType: application/json`) and maps the response to a
+   (temperature 0, `responseMimeType: application/json` + a `responseSchema` from
+   `schemas.ts`), validates the response with zod (`extractionSchema.safeParse`),
+   retries once with the validation errors appended, and only then maps it to a
    `CaseFile`.
 4. All analysis — score, flags, waterfall, rejection classification, grievance letter,
    Hindi summary — is recomputed deterministically in `rules.ts` / `grievance.ts` /
@@ -137,12 +141,14 @@ local `.env` (see `.env.example`) — never commit a real key; `.env*` is gitign
 
 ## Testing
 
-There are no tests. The deterministic engine in `src/engine/rules.ts` is the part most
-worth testing if tests are introduced; verify it against the three bundled sample cases.
-Until then, the verification bar for any change is:
+The deterministic engine is covered by a vitest suite in `src/engine/__tests__/`
+(`rules`, `grievance`, `hindi`, `gemini`), including the three bundled sample cases'
+documented scores and payouts. Every engine change ships with assertions in the same
+commit. The verification bar for any change:
 
-1. `npm run build` passes (strict `tsc -b` + Vite production build).
-2. `npm run dev` → the three sample cases load, and the verdict/waterfall numbers change
+1. `npm run test` and `npm run lint` pass.
+2. `npx tsc --noEmit -p tsconfig.app.json` and `npm run build` pass.
+3. `npm run dev` → the three sample cases load, and the verdict/waterfall numbers change
    appropriately if you touched the engine.
 
 ## Security considerations
