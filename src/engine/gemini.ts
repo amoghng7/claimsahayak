@@ -68,7 +68,11 @@ export async function extractCaseWithGemini(apiKey: string, docs: DocText[]): Pr
     },
   }
 
-  const res = await fetch(`${ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
+  const url = apiKey === 'PROXY' 
+    ? '/api/gemini/generate' 
+    : `${ENDPOINT}?key=${encodeURIComponent(apiKey)}`;
+
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -105,9 +109,9 @@ const KEY_STORAGE = 'claimsahayak.geminiKey'
 
 export function loadGeminiKey(): string {
   try {
-    return localStorage.getItem(KEY_STORAGE) ?? ''
+    return localStorage.getItem(KEY_STORAGE) || 'PROXY'
   } catch {
-    return ''
+    return 'PROXY'
   }
 }
 

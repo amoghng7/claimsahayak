@@ -1,5 +1,5 @@
 server {
-    listen 8080;
+    listen ${PORT};
     server_name _;
     root /usr/share/nginx/html;
     index index.html;
@@ -9,10 +9,26 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none';" always;
-
-    # HSTS — Cloud Run provides HTTPS termination; this ensures browsers remember
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none';" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # --- Secure Backend Proxy for Gemini ---
+    location = /api/gemini/generate {
+        # Only allow POST requests
+        limit_except POST {
+            deny all;
+        }
+        
+        resolver 8.8.8.8;
+        # Proxy strictly to the flash generateContent endpoint and inject the secret key
+        proxy_pass https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY};
+        proxy_set_header Host generativelanguage.googleapis.com;
+        proxy_ssl_server_name on;
+        
+        # Prevent forwarding client IP to Google
+        proxy_set_header X-Real-IP "";
+        proxy_set_header X-Forwarded-For "";
+    }
 
     # --- SPA routing: serve index.html for all paths ---
     location / {

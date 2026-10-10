@@ -19,9 +19,9 @@ function SettingsSheet({
       <div className="panel w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-2xl font-semibold">Settings</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-3">
-          To read your own policy and hospital PDFs, the desk calls Gemini directly from your
-          browser with a key you provide (Google AI Studio → “Get API key”). The key never
-          leaves this browser. Without it, the desk runs fully on the bundled sample cases.
+          The desk uses a secure managed backend key to extract data from your uploaded PDFs. 
+          If you prefer to use your own key (or if the backend is rate-limited), you can 
+          override it here. The key never leaves your browser.
         </p>
         <label className="mt-4 block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
           Gemini API key
