@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Landing } from './sections/Landing'
 import { Workbench } from './sections/Workbench'
 import {
@@ -29,24 +29,56 @@ function SettingsSheet({
   // Mounted only while open — initial state is always the current stored key.
   const [stored] = useState<string | null>(() => storedPersonalKey())
   const [draft, setDraft] = useState('')
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Modal focus management: focus the field on open, restore focus to the
+  // opener (header key button) on close.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    panelRef.current?.querySelector<HTMLElement>('input')?.focus()
+    return () => opener?.focus()
+  }, [])
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
+      return
+    }
+    if (e.key !== 'Tab' || !panelRef.current) return
+    const focusable = Array.from(
+      panelRef.current.querySelectorAll<HTMLElement>('button, input, [tabindex]:not([tabindex="-1"])'),
+    )
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    if (!first || !last) return
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+
   const removeKey = () => {
     saveGeminiKey('')
     onSaved()
     onClose()
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" onClick={onClose} data-print-hidden>
-      <div className="panel w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" onClick={onClose} onKeyDown={onKeyDown} data-print-hidden>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Settings" className="panel w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-2xl font-semibold">Settings</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-3">
           The desk uses a secure managed backend key to extract data from your uploaded PDFs.
           If you prefer to use your own key (or if the backend is rate-limited), you can
           override it here. The key never leaves your browser.
         </p>
-        <label className="mt-4 block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+        <label htmlFor="gemini-key" className="mt-4 block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
           Gemini API key
         </label>
         <input
+          id="gemini-key"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           type="password"
