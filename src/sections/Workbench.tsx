@@ -377,6 +377,7 @@ function RejectionDesk({
         <PanelTitle>Rejection desk</PanelTitle>
         <textarea
           value={letter}
+          aria-label="Rejection letter text"
           onChange={(e) => setLetter(e.target.value)}
           placeholder="Paste the insurer's repudiation letter here…"
           rows={5}
