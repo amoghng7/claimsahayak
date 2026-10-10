@@ -8,8 +8,9 @@ import {
   type RejectionVerdict,
   type Verdict,
 } from '../engine/rules'
-import { buildGrievanceLetter } from '../engine/grievance'
-import { hindiSummary } from '../engine/hindi'
+import { analyzeRejectionWithFallback, parseRejectionDate } from '../engine/rejection'
+import { buildEscalationLadder, buildGrievanceLetter, type EscalationStep } from '../engine/grievance'
+import { hindiRejectionSummary, hindiSummary } from '../engine/hindi'
 import { formatINR, formatDate } from '../engine/format'
 import { fileToDocText } from '../engine/pdf'
 import { extractCaseWithGemini, loadGeminiKey, storedPersonalKey } from '../engine/gemini'
@@ -312,65 +313,124 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
 
 /* ---------- right rail: rejection desk, letter, Hindi ---------- */
 
+function EscalationLadder({ steps }: { steps: EscalationStep[] }) {
+  return (
+    <div>
+      <PanelTitle>Escalation ladder — dated</PanelTitle>
+      <ol className="space-y-2">
+        {steps.map((s, i) => (
+          <li key={s.title} className="rise border border-line bg-paper-2/60 px-3 py-2.5" style={{ animationDelay: `${i * 80}ms` }}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[13px] font-medium">
+                <span className="mr-1.5 font-mono text-[11px] text-ink-3">{i + 1}.</span>
+                {s.title}
+              </span>
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-ink-3">{s.dateLabel}</span>
+            </div>
+            <p className="mt-1 text-[12px] leading-relaxed text-ink-3">{s.detail}</p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 function RejectionDesk({
   letter,
   setLetter,
+  rejectionDate,
+  setRejectionDate,
   analysis,
+  aiBusy,
   onAnalyze,
+  hindiLines,
+  ladder,
 }: {
   letter: string
   setLetter: (s: string) => void
+  rejectionDate: string
+  setRejectionDate: (s: string) => void
   analysis: RejectionVerdict | null
+  aiBusy: boolean
   onAnalyze: () => void
+  hindiLines: string[] | null
+  ladder: EscalationStep[] | null
 }) {
   return (
-    <div>
-      <PanelTitle>Rejection desk</PanelTitle>
-      <textarea
-        value={letter}
-        onChange={(e) => setLetter(e.target.value)}
-        placeholder="Paste the insurer's repudiation letter here…"
-        rows={5}
-        className="w-full resize-y border border-line bg-paper px-3 py-2 font-mono text-[12px] leading-relaxed placeholder:text-ink-3/60 focus:outline-none focus:ring-2 focus:ring-brick"
-      />
-      <button
-        onClick={onAnalyze}
-        disabled={!letter.trim()}
-        className="mt-2 w-full rounded-full bg-ink py-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition-transform duration-150 hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0"
-      >
-        Classify the rejection
-      </button>
-
-      {analysis && (
-        <div className="rise mt-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="font-medium text-sm">{analysis.reason}</span>
-            <span
-              className="rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
-              style={{
-                background:
-                  analysis.reversible === 'yes' ? 'var(--mint)' : analysis.reversible === 'partial' ? 'var(--brick)' : 'var(--crimson)',
-                color: analysis.reversible === 'hard' ? 'var(--paper)' : 'var(--ink)',
-              }}
-            >
-              {analysis.reversible === 'yes' ? 'Reversible' : analysis.reversible === 'partial' ? 'Partly winnable' : 'Hard'}
-            </span>
-          </div>
-          <p className="text-[13px] leading-relaxed text-ink-3">{analysis.explanation}</p>
-          <ol className="list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed">
-            {analysis.steps.map((s, i) => (
-              <li key={i}>{s}</li>
-            ))}
-          </ol>
-          <div className="border-t border-line pt-2">
-            {analysis.clauses.map((cl, i) => (
-              <p key={i} className="font-mono text-[10.5px] leading-relaxed text-ink-3/80">
-                § {cl}
-              </p>
-            ))}
-          </div>
+    <div className="space-y-6">
+      <div>
+        <PanelTitle>Rejection desk</PanelTitle>
+        <textarea
+          value={letter}
+          onChange={(e) => setLetter(e.target.value)}
+          placeholder="Paste the insurer's repudiation letter here…"
+          rows={5}
+          className="w-full resize-y border border-line bg-paper px-3 py-2 font-mono text-[12px] leading-relaxed placeholder:text-ink-3/60 focus:outline-none focus:ring-2 focus:ring-brick"
+        />
+        <div className="mt-2 flex items-center gap-2.5">
+          <label className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3" htmlFor="rejection-date">
+            Rejection date
+          </label>
+          <input
+            id="rejection-date"
+            type="date"
+            value={rejectionDate}
+            onChange={(e) => setRejectionDate(e.target.value)}
+            className="flex-1 border border-line bg-paper px-2.5 py-1.5 font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-brick"
+          />
         </div>
-      )}
+        <button
+          onClick={onAnalyze}
+          disabled={!letter.trim() || aiBusy}
+          className="mt-2 w-full rounded-full bg-ink py-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-paper transition-transform duration-150 hover:-translate-y-0.5 disabled:opacity-40 disabled:hover:translate-y-0"
+        >
+          {aiBusy ? 'Reading with AI…' : 'Classify the rejection'}
+        </button>
+
+        {analysis && (
+          <div className="rise mt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">{analysis.reason}</span>
+              <span
+                className="rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
+                style={{
+                  background:
+                    analysis.reversible === 'yes' ? 'var(--mint)' : analysis.reversible === 'partial' ? 'var(--brick)' : 'var(--crimson)',
+                  color: analysis.reversible === 'hard' ? 'var(--paper)' : 'var(--ink)',
+                }}
+              >
+                {analysis.reversible === 'yes' ? 'Reversible' : analysis.reversible === 'partial' ? 'Partly winnable' : 'Hard'}
+              </span>
+            </div>
+            {analysis.aiAssisted && (
+              <p className="font-mono text-[10px] uppercase tracking-wider text-ink-3/80">
+                classified with AI assistance — verify against the letter
+              </p>
+            )}
+            <p className="text-[13px] leading-relaxed text-ink-3">{analysis.explanation}</p>
+            {analysis.advisory && (
+              <p className="border-l-2 border-brick pl-3 text-[12.5px] italic leading-relaxed text-ink-3">
+                AI interpretation of the letter: {analysis.advisory}
+              </p>
+            )}
+            <ol className="list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed">
+              {analysis.steps.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ol>
+            <div className="border-t border-line pt-2">
+              {analysis.clauses.map((cl, i) => (
+                <p key={i} className="font-mono text-[10.5px] leading-relaxed text-ink-3/80">
+                  § {cl}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {ladder && <EscalationLadder steps={ladder} />}
+      {hindiLines && <HindiPanel lines={hindiLines} title="सरल हिंदी सारांश (प्रायोगिक)" />}
     </div>
   )
 }
@@ -382,17 +442,25 @@ function GrievancePanel({ text }: { text: string | null }) {
     <div>
       <PanelTitle
         right={
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(text).then(() => {
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1600)
-              })
-            }}
-            className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
-          >
-            {copied ? 'copied ✓' : 'copy letter'}
-          </button>
+          <span className="flex gap-4">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(text).then(() => {
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1600)
+                })
+              }}
+              className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+            >
+              {copied ? 'copied ✓' : 'copy letter'}
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="font-mono text-[10px] uppercase tracking-wider text-ink underline underline-offset-4 hover:text-crimson"
+            >
+              Print / Save as PDF
+            </button>
+          </span>
         }
       >
         Grievance letter — drafted
@@ -404,10 +472,27 @@ function GrievancePanel({ text }: { text: string | null }) {
   )
 }
 
-function HindiPanel({ lines }: { lines: string[] }) {
+/** Print-only rendering of the grievance letter — a clean A4 document. */
+function PrintLetter({ text }: { text: string }) {
+  // The signature block is kept together so it never orphans onto a page.
+  const sigStart = text.indexOf('Yours faithfully,')
+  const footStart = text.indexOf('\nSources:')
+  const body = sigStart >= 0 ? text.slice(0, sigStart) : text
+  const signature = sigStart >= 0 ? text.slice(sigStart, footStart >= 0 ? footStart : undefined) : ''
+  const foot = footStart >= 0 ? text.slice(footStart) : ''
+  return (
+    <div className="print-letter hidden print:block" aria-hidden>
+      <div className="whitespace-pre-wrap">{body}</div>
+      {signature && <div className="signature-block whitespace-pre-wrap">{signature}</div>}
+      {foot && <div className="letter-foot whitespace-pre-wrap">{foot}</div>}
+    </div>
+  )
+}
+
+function HindiPanel({ lines, title = 'हिंदी सारांश' }: { lines: string[]; title?: string }) {
   return (
     <div>
-      <PanelTitle>हिंदी सारांश</PanelTitle>
+      <PanelTitle>{title}</PanelTitle>
       <div className="space-y-2.5 border border-line bg-paper-2/70 p-4">
         {lines.map((l, i) => (
           <p key={i} className="text-[13.5px] leading-relaxed">
@@ -557,6 +642,12 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
   const [analysis, setAnalysis] = useState<RejectionVerdict | null>(
     baseline.rejectionLetter ? analyzeRejection(baseline, baseline.rejectionLetter) : null,
   )
+  const [rejectionDate, setRejectionDate] = useState<string>(
+    () =>
+      (baseline.rejectionLetter ? parseRejectionDate(baseline.rejectionLetter) : null) ??
+      new Date().toISOString().slice(0, 10),
+  )
+  const [aiBusy, setAiBusy] = useState(false)
   const [busy, setBusy] = useState(false)
   const [uploadNote, setUploadNote] = useState<string | null>(null)
 
@@ -578,9 +669,17 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
 
   const verdict = useMemo(() => buildVerdict(caseFile), [caseFile])
   const hindi = useMemo(() => hindiSummary(caseFile, verdict), [caseFile, verdict])
-  const grievance = useMemo(
-    () => (analysis ? buildGrievanceLetter(caseFile, analysis) : null),
+  const hindiRejection = useMemo(
+    () => (analysis ? hindiRejectionSummary(caseFile, analysis) : null),
     [analysis, caseFile],
+  )
+  const ladder = useMemo(
+    () => (analysis ? buildEscalationLadder(rejectionDate) : null),
+    [analysis, rejectionDate],
+  )
+  const grievance = useMemo(
+    () => (analysis ? buildGrievanceLetter(caseFile, analysis, rejectionDate) : null),
+    [analysis, caseFile, rejectionDate],
   )
 
   const pick = (c: CaseFile) => {
@@ -588,6 +687,28 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
     setLines(toEditable(c.episode.billLines))
     setLetter(c.rejectionLetter ?? '')
     setAnalysis(c.rejectionLetter ? analyzeRejection(c, c.rejectionLetter) : null)
+    setRejectionDate(
+      (c.rejectionLetter ? parseRejectionDate(c.rejectionLetter) : null) ??
+        new Date().toISOString().slice(0, 10),
+    )
+  }
+
+  const onAnalyze = async () => {
+    const text = letter.trim()
+    if (!text) return
+    const instant = analyzeRejection(caseFile, text)
+    setAnalysis(instant)
+    const parsed = parseRejectionDate(text)
+    if (parsed) setRejectionDate(parsed)
+    // The regex classifier is primary; Gemini is consulted only on a miss.
+    if (instant.patternId === 'unknown') {
+      setAiBusy(true)
+      try {
+        setAnalysis(await analyzeRejectionWithFallback(caseFile, text, loadGeminiKey()))
+      } finally {
+        setAiBusy(false)
+      }
+    }
   }
 
   const onFiles = async (files: FileList) => {
@@ -622,7 +743,7 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
 
   return (
     <div className="mx-auto max-w-shell px-6 py-8">
-      <div className="grid gap-8 lg:grid-cols-[280px_1fr_360px]">
+      <div className="grid gap-8 lg:grid-cols-[280px_1fr_360px]" data-print-hidden>
         <aside>
           <CaseRail current={caseFile} onPick={pick} onFiles={onFiles} busy={busy} uploadNote={uploadNote} />
         </aside>
@@ -636,8 +757,13 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
           <RejectionDesk
             letter={letter}
             setLetter={setLetter}
+            rejectionDate={rejectionDate}
+            setRejectionDate={setRejectionDate}
             analysis={analysis}
-            onAnalyze={() => letter.trim() && setAnalysis(analyzeRejection(caseFile, letter))}
+            aiBusy={aiBusy}
+            onAnalyze={onAnalyze}
+            hindiLines={hindiRejection}
+            ladder={ladder}
           />
           <GrievancePanel text={grievance} />
           <HindiPanel lines={hindi} />
@@ -655,6 +781,7 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
           </div>
         </aside>
       </div>
+      {grievance && <PrintLetter text={grievance} />}
     </div>
   )
 }

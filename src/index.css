@@ -198,3 +198,45 @@
     scroll-behavior: auto;
   }
 }
+
+/* ------------------------------------------------------------------
+   Print — the grievance letter is filed on paper. Only the letter
+   prints: ink on white A4, no paper texture, no chrome.
+------------------------------------------------------------------- */
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  [data-print-hidden] {
+    display: none !important;
+  }
+  .rise,
+  .stamp-ring,
+  .pulse-dot {
+    animation: none !important;
+  }
+  .print-letter {
+    font-family: "Fraunces", "Noto Sans Devanagari", serif;
+    font-size: 11.5pt;
+    line-height: 1.65;
+    color: #000;
+  }
+  .print-letter .signature-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-letter .letter-foot {
+    margin-top: 14pt;
+    font-size: 8.5pt;
+    color: #333;
+  }
+}

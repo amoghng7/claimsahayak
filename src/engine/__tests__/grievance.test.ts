@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { analyzeRejection } from '../rules'
-import { buildGrievanceLetter } from '../grievance'
+import { buildEscalationLadder, buildGrievanceLetter } from '../grievance'
 import { SAMPLE_CASES } from '../../data/samples'
 
 const arvind = SAMPLE_CASES[2]
@@ -49,5 +49,55 @@ describe('buildGrievanceLetter', () => {
   it('lists its sources at the end', () => {
     expect(letter).toContain('IRDAI/HLT/CIR/PRO/84/5/2024')
     expect(letter).toContain('Insurance Ombudsman Rules, 2017')
+  })
+})
+
+describe('buildGrievanceLetter — dated variant', () => {
+  const dated = buildGrievanceLetter(arvind, verdict, '2026-10-01')
+
+  it('computes the 14-day deadline from the rejection date', () => {
+    expect(dated).toContain('within 14 days')
+    expect(dated).toContain('15 Oct 2026')
+    expect(dated).toContain('repudiation dated 1 Oct 2026')
+  })
+
+  it('carries the grievance-cell header and claim/policy reference lines', () => {
+    expect(dated).toContain('Grievance Cell, National Arogya Insurance Co.')
+    expect(dated).toContain('Claim No.:')
+    expect(dated).toContain('Policy No.: NA/SC/19/223411')
+  })
+
+  it('keeps the sources footer and leaves no placeholders', () => {
+    expect(dated).toContain('IRDAI/HLT/CIR/PRO/84/5/2024')
+    expect(dated).not.toMatch(/\{\{/)
+    expect(dated).not.toMatch(/__/)
+  })
+})
+
+describe('buildEscalationLadder', () => {
+  const ladder = buildEscalationLadder('2026-10-01')
+
+  it('has four rungs in order', () => {
+    expect(ladder).toHaveLength(4)
+    expect(ladder[0].title).toContain('GRO')
+    expect(ladder[1].title).toContain('Bima Bharosa')
+    expect(ladder[2].title).toContain('Ombudsman')
+    expect(ladder[3].title).toContain('Consumer forum')
+  })
+
+  it('computes dates from the rejection date', () => {
+    expect(ladder[0].date).toBe('2026-10-15') // GRO: 14 days
+    expect(ladder[1].date).toBe('2026-10-31') // Bima Bharosa: unresolved in 30 days
+    expect(ladder[2].date).toBe('2027-10-01') // Ombudsman: within 1 year
+    expect(ladder[3].date).toBeNull() // consumer forum: alternative, no computed date
+  })
+
+  it('carries the verified regulatory positions', () => {
+    const text = ladder.map((s) => s.detail).join('\n')
+    expect(text).toContain('₹50 lakh')
+    expect(text).toContain('₹5,000/day')
+    expect(text).toContain('bimabharosa.irdai.gov.in')
+    expect(text).toContain('155255')
+    expect(text).toContain('Rule 14(5)')
   })
 })

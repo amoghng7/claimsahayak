@@ -35,3 +35,19 @@ export function addMonths(iso: string, months: number): string {
   if (d.getDate() < day) d.setDate(0) // Jan 31 + 1 → Feb 28, not Mar 3
   return d.toISOString().slice(0, 10)
 }
+
+/** ISO date `days` days after `iso`. UTC arithmetic — no local-timezone drift. */
+export function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** ISO date `years` calendar years after `iso` (Feb 29 clamps to Feb 28). */
+export function addYears(iso: string, years: number): string {
+  const d = new Date(`${iso}T00:00:00Z`)
+  const day = d.getUTCDate()
+  d.setUTCFullYear(d.getUTCFullYear() + years)
+  if (d.getUTCDate() < day) d.setUTCDate(0)
+  return d.toISOString().slice(0, 10)
+}

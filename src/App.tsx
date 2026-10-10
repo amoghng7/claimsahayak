@@ -35,7 +35,7 @@ function SettingsSheet({
     onClose()
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" onClick={onClose} data-print-hidden>
       <div className="panel w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-2xl font-semibold">Settings</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-3">
@@ -102,7 +102,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-sm" data-print-hidden>
         <div className="mx-auto flex max-w-shell items-center justify-between px-6 py-3.5">
           <button onClick={() => setView('landing')} className="flex items-baseline gap-2.5">
             <span className="font-display text-[22px] font-semibold leading-none">ClaimSahayak</span>
@@ -146,7 +146,7 @@ export default function App() {
         <Workbench key={initialCase ?? 'default'} initialCaseId={initialCase} />
       )}
 
-      <footer className="border-t border-line">
+      <footer className="border-t border-line" data-print-hidden>
         <div className="mx-auto flex max-w-shell flex-col gap-2 px-6 py-6 font-mono text-[10.5px] leading-relaxed text-ink-3 sm:flex-row sm:items-center sm:justify-between">
           <span>CLAIMSAHAYAK · GOOGLE CLOUD AI BUILDER CUP 2026 · JAPAC</span>
           <span>Sample cases are fictional. Assistive analysis — not insurance or legal advice.</span>
