@@ -21,7 +21,7 @@ import { ScoreStamp } from '../components/ScoreStamp'
 const BAND_CHIP: Record<string, string> = {
   strong: 'bg-mint text-ink',
   fair: 'bg-brick text-ink',
-  weak: 'bg-crimson text-paper',
+  weak: 'bg-crimson-deep text-paper',
 }
 const BAND_LABEL: Record<string, string> = {
   strong: 'Claim-ready',
@@ -60,7 +60,7 @@ function CaseRail({
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm">{c.claimant}</span>
-                {c.rejectionLetter && <span className="font-mono text-[10px] text-crimson">REJECTED</span>}
+                {c.rejectionLetter && <span className="font-mono text-[10px] text-crimson-deep">REJECTED</span>}
               </div>
               <div className="font-mono text-[11px] text-ink-3 mt-0.5">
                 {CASE_LABELS[c.id]} · {formatINR(c.episode.totalBill)}
@@ -145,7 +145,7 @@ function FlagRow({ flag, delay }: { flag: DeductionFlag; delay: number }) {
           <p className="mt-2 font-mono text-[10.5px] leading-relaxed text-ink-3/80">{flag.clause}</p>
         </div>
         <div className="shrink-0 text-right">
-          <div className="font-mono text-sm font-semibold text-crimson">−{formatINR(flag.amountAtRisk)}</div>
+          <div className="font-mono text-sm font-semibold text-crimson-deep">−{formatINR(flag.amountAtRisk)}</div>
           <div className="font-mono text-[10px] uppercase tracking-wider text-ink-3">at risk</div>
         </div>
       </div>
@@ -155,14 +155,15 @@ function FlagRow({ flag, delay }: { flag: DeductionFlag; delay: number }) {
 
 function Waterfall({ v }: { v: Verdict }) {
   const p = v.payable
+  const crimsonAa = 'color-mix(in srgb, var(--crimson) 80%, var(--ink))'
   const rows: [string, number, string, boolean][] = [
     ['Total billed', p.total, 'var(--ink)', false],
-    ['Room-rent excess', -p.roomCut, 'var(--crimson)', true],
-    ['Proportional cut on linked charges', -p.proportionalCut, 'var(--crimson)', true],
+    ['Room-rent excess', -p.roomCut, crimsonAa, true],
+    ['Proportional cut on linked charges', -p.proportionalCut, crimsonAa, true],
   ]
-  if (p.exclusionCut > 0) rows.push(['Permanent-exclusion cut', -p.exclusionCut, 'var(--crimson)', true])
-  if (p.pedCut > 0) rows.push(['PED waiting-period exclusion', -p.pedCut, 'var(--crimson)', true])
-  for (const cut of p.subLimitCuts) rows.push([cut.label, -cut.amount, 'var(--crimson)', true])
+  if (p.exclusionCut > 0) rows.push(['Permanent-exclusion cut', -p.exclusionCut, crimsonAa, true])
+  if (p.pedCut > 0) rows.push(['PED waiting-period exclusion', -p.pedCut, crimsonAa, true])
+  for (const cut of p.subLimitCuts) rows.push([cut.label, -cut.amount, crimsonAa, true])
   rows.push(
     ['Non-payable consumables', -p.nonPayableCut, 'var(--brick)', true],
     ['Co-payment', -p.copayCut, 'var(--brick)', true],
@@ -235,7 +236,7 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
       </div>
 
       <div>
-        <PanelTitle right={<span className="font-mono text-[10px] text-crimson">{v.flags.length} flags</span>}>
+        <PanelTitle right={<span className="font-mono text-[10px] text-crimson-deep">{v.flags.length} flags</span>}>
           Deduction traps &amp; risks
         </PanelTitle>
         {v.flags.length === 0 ? (
@@ -274,7 +275,7 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
                 >
                   <span className="text-[13px]">{e.label}</span>
                   {hit && (
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-crimson">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-crimson-deep">
                       matches this treatment
                     </span>
                   )}
@@ -304,7 +305,7 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
                 <div>
                   <div className="text-sm font-medium">
                     {m.label}
-                    {m.mandatory && <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-crimson">mandatory</span>}
+                    {m.mandatory && <span className="ml-2 font-mono text-[10px] uppercase tracking-wider text-crimson-deep">mandatory</span>}
                   </div>
                   <p className="mt-0.5 text-[12.5px] text-ink-3">{m.why}</p>
                 </div>
@@ -409,7 +410,7 @@ function RejectionDesk({
                 className="rounded-full px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
                 style={{
                   background:
-                    analysis.reversible === 'yes' ? 'var(--mint)' : analysis.reversible === 'partial' ? 'var(--brick)' : 'var(--crimson)',
+                    analysis.reversible === 'yes' ? 'var(--mint)' : analysis.reversible === 'partial' ? 'var(--brick)' : 'color-mix(in srgb, var(--crimson) 80%, var(--ink))',
                   color: analysis.reversible === 'hard' ? 'var(--paper)' : 'var(--ink)',
                 }}
               >

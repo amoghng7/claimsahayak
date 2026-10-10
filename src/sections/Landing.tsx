@@ -45,7 +45,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
               <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                 Case file · NA/HC/21/884532
               </span>
-              <span className="font-mono text-[11px] text-crimson">FLAGGED</span>
+              <span className="font-mono text-[11px] text-crimson-deep">FLAGGED</span>
             </div>
             <div className="flex items-center gap-6 py-5">
               <ScoreStamp score={53} band="fair" size={132} />

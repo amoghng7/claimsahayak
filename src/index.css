@@ -130,6 +130,14 @@
   .flag.good {
     border-left-color: color-mix(in srgb, var(--mint) 70%, var(--ink));
   }
+  /* AA-contrast crimson for small text / chip fills on paper (5.18:1);
+     decorative crimson (borders, dots, large display numerals) keeps --crimson */
+  .text-crimson-deep {
+    color: color-mix(in srgb, var(--crimson) 80%, var(--ink));
+  }
+  .bg-crimson-deep {
+    background-color: color-mix(in srgb, var(--crimson) 80%, var(--ink));
+  }
   /* ledger table */
   .ledger td,
   .ledger th {
