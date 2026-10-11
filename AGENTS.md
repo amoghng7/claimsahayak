@@ -165,6 +165,11 @@ local `.env` (see `.env.example`). With neither set the middleware answers HTTP 
   The runtime service account holds `roles/aiplatform.user` (see `infra/06-1-vertex.sh`).
   Phase 06 step 6.1 retired the `GEMINI_API_KEY` Secret Manager binding; access is
   IAM-governed with per-request audit in Cloud Logging.
+- Ops guardrails (6.3): ₹1,000/month budget alert at 50/90/100% (`infra/06-3-budgets.sh`),
+  Monitoring alerts for Cloud Run 5xx and Gemini-call spikes (`infra/06-3-alerts.sh`,
+  log-based metric `gemini_proxy_calls`, email channel). Cloud Armor is deliberately
+  deferred — it requires an external HTTPS load balancer + custom domain (~$18/month);
+  the nginx `limit_req` rate limit remains the edge control.
 
 ## Code style guidelines
 

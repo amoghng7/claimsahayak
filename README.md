@@ -107,7 +107,7 @@ no key material anywhere. Further hardening (Phase 06, `plan/06-production-backe
 |---|---|---|
 | Extraction | **Vertex AI** (Gemini) behind the Cloud Run sidecar, IAM-governed | per-request audit dashboards |
 | Scanned PDFs | **Document AI** OCR via the sidecar's `/api/ocr` (6.2 done) | form-parser upgrade for bills |
-| Edge protection | nginx rate limit | **Cloud Armor** + budget/monitoring alerts (6.3) |
+| Edge protection | nginx rate limit + ₹1,000/mo budget alert (50/90/100%) + 5xx and Gemini-spike Monitoring alerts (6.3) | **Cloud Armor** WAF — deferred: needs an external LB + custom domain (~$18/mo) |
 | Storage | consent-gated **Firestore** case history + **Cloud Storage** document archive (6.4 done, default off) | account-based sync |
 
 ## Repo layout
