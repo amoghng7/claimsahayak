@@ -136,6 +136,14 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # --- ES module workers (pdf.js): nginx mime.types has no .mjs mapping,
+    #     and module scripts are rejected unless served as JavaScript ---
+    location ~* \.mjs$ {
+        default_type text/javascript;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
     # --- Cache static assets aggressively ---
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
         expires 1y;
