@@ -32,5 +32,14 @@ gcloud projects add-iam-policy-binding "$PROJECT" \
 gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" \
   --member="serviceAccount:$RUNTIME_SA" --role="roles/storage.objectAdmin" > /dev/null
 
+# Firestore TTL on expireAt (server writes savedAt + 30d): documents are
+# deleted automatically once expireAt is in the past. REST because gcloud
+# beta/alpha components are unavailable on installer-based SDKs.
+TOKEN=$(gcloud auth print-access-token)
+curl -s -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  "https://firestore.googleapis.com/v1/projects/$PROJECT/databases/(default)/collectionGroups/cases/fields/expireAt?updateMask=ttlConfig" \
+  -d '{"ttlConfig":{}}' > /dev/null
+echo "Firestore TTL enabling on cases.expireAt (async op — check field state in console)"
+
 echo "Done. Set on the Cloud Run service:"
 echo "  FIRESTORE_PROJECT=$PROJECT  GCS_BUCKET=$BUCKET"

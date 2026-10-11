@@ -105,3 +105,32 @@ describe('cases API', () => {
     await expect(store.listCases()).rejects.toThrow(/FIRESTORE_PROJECT/)
   })
 })
+
+describe('optOut', () => {
+  it('purges server-side cases with the session, then clears local consent + session', async () => {
+    const { store, calls } = makeStore()
+    store.setConsent(true)
+    const sid = store.sessionId()
+    await store.optOut()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toBe('/api/cases')
+    expect(calls[0].init?.method).toBe('DELETE')
+    expect((calls[0].init?.headers as Record<string, string>)['X-Session-Id']).toBe(sid)
+    expect(store.loadConsent()).toBe(false)
+    expect(store.sessionId()).toBeNull()
+  })
+
+  it('clears local state even when the purge request fails', async () => {
+    const { store } = makeStore(async () => { throw new Error('offline') })
+    store.setConsent(true)
+    await store.optOut()
+    expect(store.loadConsent()).toBe(false)
+    expect(store.sessionId()).toBeNull()
+  })
+
+  it('is a local-only no-op when consent was never on', async () => {
+    const { store, calls } = makeStore()
+    await store.optOut()
+    expect(calls).toHaveLength(0)
+  })
+})

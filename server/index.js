@@ -42,11 +42,14 @@ async function callUpstream(res, fetchImpl, url, opts) {
   res.end(await upstream.text())
 }
 
+// Raw bytes. JSON routes decode with .toString('utf8') themselves; binary
+// routes (/api/uploads) must never pass through a string — UTF-8 decode +
+// re-encode would destroy any non-UTF-8 byte sequence (i.e. every real PDF).
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = []
     req.on('data', (c) => chunks.push(c))
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
     req.on('error', reject)
   })
 }
@@ -88,7 +91,7 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
       if (!config.docai?.processor) return json(res, 503, { error: 'not_configured', message: 'DOCAI_PROCESSOR is not set' })
       let payload
       try {
-        payload = JSON.parse(await readBody(req))
+        payload = JSON.parse((await readBody(req)).toString('utf8'))
       } catch {
         return json(res, 400, { error: 'bad_request', message: 'Body must be JSON: { content: base64, mimeType }' })
       }
@@ -125,14 +128,18 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
         const token = await getToken()
         const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
         if (req.method === 'PUT' && caseId) {
-          const body = JSON.parse(await readBody(req))
+          const body = JSON.parse((await readBody(req)).toString('utf8'))
+          const now = Date.now()
           await callUpstream(res, fetchImpl, `${colUrl}/${encodeURIComponent(caseId)}`, {
             method: 'PATCH',
             headers: authHeaders,
             body: JSON.stringify({
               fields: {
                 name: { stringValue: String(body.name ?? caseId) },
-                savedAt: { timestampValue: new Date().toISOString() },
+                savedAt: { timestampValue: new Date(now).toISOString() },
+                // TTL policy on expireAt (Firestore deletes docs whose TTL
+                // field is in the past) — the 30-day retention promise
+                expireAt: { timestampValue: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString() },
                 payload: { stringValue: String(body.payload ?? '{}') },
               },
             }),
@@ -162,6 +169,16 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
           })
         } else if (req.method === 'DELETE' && caseId) {
           await callUpstream(res, fetchImpl, `${colUrl}/${encodeURIComponent(caseId)}`, { method: 'DELETE', headers: authHeaders })
+        } else if (req.method === 'DELETE' && !caseId) {
+          // Opt-out purge: wipe the whole session's cases so turning the
+          // consent toggle off leaves nothing server-side.
+          const list = await fetchImpl(colUrl, { headers: authHeaders })
+          const data = JSON.parse(await list.text())
+          for (const d of data.documents ?? []) {
+            const id = d.name.split('/').pop()
+            await fetchImpl(`${colUrl}/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders })
+          }
+          json(res, 200, { purged: (data.documents ?? []).length })
         } else {
           json(res, 405, { error: 'method_not_allowed' })
         }

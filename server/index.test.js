@@ -58,7 +58,7 @@ describe('POST /generate', () => {
     assert.equal(calls.length, 1)
     assert.equal(calls[0].url, vertexUrl(config))
     assert.equal(calls[0].opts.headers.Authorization, 'Bearer token-123')
-    assert.equal(calls[0].opts.body, FAKE_BODY)
+    assert.equal(Buffer.from(calls[0].opts.body).toString('utf8'), FAKE_BODY)
   })
 
   it('passes through an upstream error status and body unchanged', async () => {
@@ -252,6 +252,11 @@ describe('POST /api/cases/:caseId', () => {
     assert.equal(sent.fields.name.stringValue, 'Ramesh')
     assert.equal(sent.fields.payload.stringValue, '{"a":1}')
     assert.ok(sent.fields.savedAt.timestampValue)
+    // Firestore TTL deletes when the field is in the past — expireAt carries
+    // savedAt + 30 days so retention matches the UI promise
+    const savedAt = Date.parse(sent.fields.savedAt.timestampValue)
+    const expireAt = Date.parse(sent.fields.expireAt.timestampValue)
+    assert.equal(expireAt - savedAt, 30 * 24 * 60 * 60 * 1000)
   })
 
   it('answers 401 when the session id is missing or malformed', async () => {
@@ -354,7 +359,7 @@ describe('POST /api/cases/:caseId', () => {
     assert.equal(res.statusCode, 200)
     assert.match(calls[0].url, /upload\/storage\/v1\/b\/claimsahayak-docs\/o\?uploadType=media&name=/)
     assert.match(calls[0].url, /uploads%2F11111111-2222-4333-8444-555555555555%2F/)
-    assert.equal(calls[0].opts.body, 'PDFBYTES')
+    assert.equal(Buffer.from(calls[0].opts.body).toString('utf8'), 'PDFBYTES')
   })
 
   it('POST /api/uploads is 503 when no bucket is configured', async () => {
@@ -366,5 +371,87 @@ describe('POST /api/cases/:caseId', () => {
     const res = mockRes()
     await handler(storeReq('POST', '/api/uploads?name=bill.pdf', 'x'), res)
     assert.equal(res.statusCode, 503)
+  })
+})
+
+describe('POST /api/uploads binary integrity', () => {
+  it('forwards bytes ≥ 0x80 unchanged (no UTF-8 mangling)', async () => {
+    // %PDF-1.4 header + bytes that are invalid UTF-8 on their own
+    const binary = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0xff, 0xfe, 0x80, 0x90, 0x00, 0x0a])
+    const calls = []
+    const handler = createHandler({
+      config: { project: 'p', location: 'global', model: 'm', store: { project: 'p' }, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, opts })
+        return { status: 200, text: async () => '{}' }
+      },
+    })
+    const res = mockRes()
+    const r = {
+      method: 'POST',
+      url: '/api/uploads?name=x.pdf',
+      headers: { 'x-session-id': '11111111-2222-4333-8444-555555555555' },
+      on(ev, cb) {
+        if (ev === 'data') cb(binary)
+        if (ev === 'end') cb()
+      },
+    }
+    await handler(r, res)
+    assert.equal(res.statusCode, 200)
+    assert.ok(Buffer.isBuffer(calls[0].opts.body) || calls[0].opts.body instanceof Uint8Array,
+      'upload body must be bytes, not a decoded string')
+    assert.deepEqual(Buffer.from(calls[0].opts.body), binary)
+  })
+})
+
+describe('DELETE /api/cases (opt-out purge)', () => {
+  const SID = '11111111-2222-4333-8444-555555555555'
+  function storeReq2(method, url) {
+    const r = req(method, url, '')
+    r.headers['x-session-id'] = SID
+    return r
+  }
+
+  it('deletes every case document in the session', async () => {
+    const calls = []
+    let listed = false
+    const handler = createHandler({
+      config: { project: 'p', location: 'global', model: 'm', store: { project: 'p' }, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async (url, opts = {}) => {
+        calls.push({ url, method: opts.method ?? 'GET' })
+        if (!listed) {
+          listed = true
+          return {
+            status: 200,
+            text: async () => JSON.stringify({
+              documents: [
+                { name: `projects/p/databases/(default)/documents/sessions/${SID}/cases/a`, fields: {} },
+                { name: `projects/p/databases/(default)/documents/sessions/${SID}/cases/b`, fields: {} },
+              ],
+            }),
+          }
+        }
+        return { status: 200, text: async () => '{}' }
+      },
+    })
+    const res = mockRes()
+    await handler(storeReq2('DELETE', '/api/cases'), res)
+    assert.equal(res.statusCode, 200)
+    const deletes = calls.filter((c) => c.method === 'DELETE')
+    assert.equal(deletes.length, 2)
+    assert.ok(deletes.every((d) => d.url.includes(`/sessions/${SID}/cases/`)))
+  })
+
+  it('still requires a session id', async () => {
+    const handler = createHandler({
+      config: { project: 'p', location: 'global', model: 'm', store: { project: 'p' }, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(req('DELETE', '/api/cases', ''), res)
+    assert.equal(res.statusCode, 401)
   })
 })

@@ -44,6 +44,19 @@ export function createCaseStore({ storage, fetchImpl, uuid }: CaseStoreDeps) {
     }
   }
 
+  // Turning consent off also wipes the server-side session: purge first
+  // (best-effort — local state is cleared regardless), then forget the id.
+  async function optOut(): Promise<void> {
+    if (loadConsent()) {
+      try {
+        await call('/api/cases', { method: 'DELETE' })
+      } catch {
+        /* offline or server down — local opt-out still happens */
+      }
+    }
+    setConsent(false)
+  }
+
   function sessionId(): string | null {
     if (!loadConsent()) return null
     let sid = storage.getItem(SESSION_KEY)
@@ -71,6 +84,7 @@ export function createCaseStore({ storage, fetchImpl, uuid }: CaseStoreDeps) {
   return {
     loadConsent,
     setConsent,
+    optOut,
     sessionId,
 
     async saveCase(id: string, name: string, payload: string): Promise<void> {

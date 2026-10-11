@@ -120,8 +120,13 @@ function SettingsSheet({
               type="checkbox"
               checked={serverSave}
               onChange={(e) => {
-                caseStore.setConsent(e.target.checked)
-                setServerSave(e.target.checked)
+                if (e.target.checked) {
+                  caseStore.setConsent(true)
+                  setServerSave(true)
+                } else {
+                  // purge server-side session, then clear locally
+                  void caseStore.optOut().finally(() => setServerSave(false))
+                }
               }}
               className="mt-1 h-4 w-4 accent-[var(--chart)]"
             />
@@ -129,8 +134,9 @@ function SettingsSheet({
               <span className="text-sm font-medium">Save my cases on the server</span>
               <span className="mt-1 block text-xs leading-relaxed text-ink-3">
                 Off by default — documents and analysis stay in this browser. Turn on to
-                keep a case history under an anonymous session id (no account). Uploaded
-                documents are stored with it and deleted automatically after 30 days.
+                keep a case history under an anonymous session id (no account). Cases and
+                uploaded documents are deleted automatically after 30 days; turning this
+                off deletes your saved cases immediately.
               </span>
             </span>
           </label>

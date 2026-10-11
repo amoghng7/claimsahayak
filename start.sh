@@ -5,7 +5,15 @@
 # startup instead of as later 502s.
 set -e
 
-node /app/server/index.js &
+# Restart loop: a crashed sidecar must not leave /api/* 502ing on an
+# otherwise-"healthy" container. The health wait below covers boot; this
+# covers runtime.
+(
+  until node /app/server/index.js; do
+    echo "start.sh: sidecar exited ($?) — restarting in 1s"
+    sleep 1
+  done
+) &
 
 healthy=0
 for i in 1 2 3 4 5; do
