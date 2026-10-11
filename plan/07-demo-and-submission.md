@@ -12,15 +12,22 @@ talking to us.
 
 ### 7.1 Submission checklist (confirm against the official portal on 16 Oct)
 
-- [ ] Re-open the hackathon submission page and list every required artifact
+- [x] Re-open the hackathon submission page and list every required artifact
       (deck? video? repo link? live URL?). Record the list here as checkboxes
       before producing anything — requirements, not memory, drive this phase.
-- [ ] Deployed Cloud Run URL loads fresh (incognito), all three sample cases
+      → Done: official FAQ (aibuildercup.com/Faqs.html) requires deployed link,
+      <3-min video, public repo, deck. Tracked in docs/submission-checklist.md.
+- [x] Deployed Cloud Run URL loads fresh (incognito), all three sample cases
       run, managed proxy works, no console errors.
+      → scratch/phase07-live-smoke.cjs + phase07-smoke-matrix.cjs, green on
+      the Vertex-backed revision.
 - [ ] Repo is presentable: README current (Phase 01), plan/ merged,
       `.env.example` accurate, no secrets anywhere in history (`git log -p |
       grep -i "api.key\|AIza"` returns nothing).
-- [ ] Tag `v1.0-submission` on the exact submitted commit.
+      → README/.env.example current; history scan clean (no AIza… keys).
+      OPEN: repo is private — flip to public before submitting.
+- [x] Tag `v1.0-submission` on the exact submitted commit.
+      → Tagged 8f17fc7 and pushed.
 
 ### 7.2 Demo video (2–3 minutes)
 
@@ -92,3 +99,18 @@ docs/architecture.md (mermaid), then help rehearse the demo script against
 the live deployment. Run the final smoke matrix and tag v1.0-submission once
 everything passes.
 ```
+
+## Execution status (completed 11 Oct 2026)
+
+- 7.1 checklist: done except repo-visibility flip (repo currently private) and the
+  portal upload itself. Official requirements sourced from aibuildercup.com/Faqs.html.
+- 7.2 video: script (docs/demo-script.md) + unattended rehearsal driver
+  (scratch/phase07-demo.cjs) ready; recording is user-owned.
+- 7.3 architecture: docs/architecture.md + committed PNG/SVG.
+- 7.4 write-up: docs/submission.md.
+- 7.5 smoke matrix: PASS (Chromium 360/1440); Firefox binary unavailable and Safari
+  not testable on Windows — both flagged in the checklist.
+- Tag v1.0-submission pushed at 8f17fc7.
+- Phase 06 was executed after this phase (user decision): 6.1 Vertex AI sidecar,
+  6.2 Document AI OCR, 6.3 budget+monitoring alerts (Cloud Armor deferred — needs
+  LB + custom domain), 6.4 consent-gated persistence. All live-verified.
