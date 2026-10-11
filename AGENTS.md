@@ -104,7 +104,8 @@ server/
                       /api/cases + /api/uploads → Firestore/GCS (ADC, session-gated),
                       GET /healthz
   index.test.js       node --test specs (handler is dependency-injected: token + fetch)
-docker-entrypoint.d/  40-sidecar.sh starts the sidecar before nginx (official entrypoint)
+start.sh              container entry: sidecar with restart loop + health wait,
+                      then the official nginx entrypoint (envsubst) as PID 1
 infra/                gcloud scripts per Phase 06 step (06-1-vertex.sh, …)
 ```
 
