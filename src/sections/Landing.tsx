@@ -1,3 +1,4 @@
+import { ProgressSteps } from '../components/ProgressSteps'
 import { Kicker, NumberedSection } from '../components/kit'
 import { ScoreStamp } from '../components/ScoreStamp'
 
@@ -70,8 +71,12 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
           </div>
         </div>
 
+        <div className="mt-16 border-t border-line pt-14 md:mt-20">
+          <ProgressSteps mode="promise" headingId="how-simple" />
+        </div>
+
         {/* fact strip — hairline-separated, mono figures */}
-        <div className="mt-20 grid gap-px border border-line bg-line md:grid-cols-3">
+        <div className="mt-16 grid gap-px border border-line bg-line md:grid-cols-3">
           {[
             ['≈40%', 'of health-claim rejections trace to documentation and procedural lapses — the most reversible class of all'],
             ['1% of SI / day', 'the room-rent cap buried in most retail policies — breach it and every linked charge shrinks proportionally'],

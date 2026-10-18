@@ -17,7 +17,12 @@ import { pdfToText } from '../engine/pdf'
 import { caseStore, type StoredCaseMeta } from '../engine/store'
 import { extractCaseWithGemini, loadGeminiKey, storedPersonalKey } from '../engine/gemini'
 import { CASE_LABELS, SAMPLE_CASES } from '../data/samples'
+import { claimMoves, type ClaimMove } from '../engine/moves'
+import { ClaimMoves } from '../components/ClaimMoves'
+import { deskPanel, type DeskPane } from '../components/deskNav'
 import { PanelTitle } from '../components/kit'
+import { PreviousScans } from '../components/PreviousScans'
+import { ProgressSteps, type DeskPhase } from '../components/ProgressSteps'
 import { ScoreStamp } from '../components/ScoreStamp'
 
 const BAND_CHIP: Record<string, string> = {
@@ -122,53 +127,64 @@ function SavedCases({ current, onPick }: { current: CaseFile; onPick: (c: CaseFi
 
 /* ---------- left rail ---------- */
 
+function extractionKeyNote(): string {
+  return storedPersonalKey()
+    ? 'Using your Gemini key — live extraction on.'
+    : 'Managed key — live extraction on. Add your own in Settings (top right) to override.'
+}
+
 function CaseRail({
   current,
   onPick,
-  onFiles,
+  onAskUpload,
   busy,
   busyNote,
   uploadNote,
+  showSamples = true,
 }: {
   current: CaseFile
   onPick: (c: CaseFile) => void
-  onFiles: (files: FileList) => void
+  onAskUpload: () => void
   busy: boolean
   busyNote: string | null
   uploadNote: string | null
+  showSamples?: boolean
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="space-y-6">
-      <nav aria-label="Sample case files">
-        <PanelTitle>Case files</PanelTitle>
-        <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-0 lg:space-y-1 lg:overflow-visible lg:pb-0">
-          {SAMPLE_CASES.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => onPick(c)}
-              className={`w-full min-w-[210px] lg:min-w-0 text-left px-3 py-2.5 border transition-colors duration-150 ${
-                current.id === c.id ? 'border-ink bg-paper-2' : 'border-line hover:bg-paper-2/60'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm">{c.claimant}</span>
-                {c.rejectionLetter && <span className="font-mono text-[10px] text-crimson-deep">REJECTED</span>}
-              </div>
-              <div className="font-mono text-[11px] text-ink-3 mt-0.5">
-                {CASE_LABELS[c.id]} · {formatINR(c.episode.totalBill)}
-              </div>
-            </button>
-          ))}
-        </div>
-      </nav>
+      {showSamples && (
+        <nav aria-label="Sample case files">
+          <PanelTitle>Case files</PanelTitle>
+          <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:gap-0 lg:space-y-1 lg:overflow-visible lg:pb-0">
+            {SAMPLE_CASES.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onPick(c)}
+                className={`w-full min-w-[210px] lg:min-w-0 text-left px-3 py-2.5 border transition-colors duration-150 ${
+                  current.id === c.id ? 'border-ink bg-paper-2' : 'border-line hover:bg-paper-2/60'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{c.claimant}</span>
+                  {c.rejectionLetter && <span className="font-mono text-[10px] text-crimson-deep">REJECTED</span>}
+                </div>
+                <div className="font-mono text-[11px] text-ink-3 mt-0.5">
+                  {CASE_LABELS[c.id]} · {formatINR(c.episode.totalBill)}
+                </div>
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
 
-      <div>
+      <div id="your-documents" className="scroll-mt-24">
         <PanelTitle right={busy ? <span className="font-mono text-[10px] text-ink-3">{busyNote ?? 'reading…'}</span> : undefined}>
           Your documents
         </PanelTitle>
         <button
-          onClick={() => inputRef.current?.click()}
+          type="button"
+          onClick={onAskUpload}
           disabled={busy}
           className="w-full border border-dashed border-ink/40 px-4 py-6 text-center transition-colors duration-150 hover:bg-paper-2/60 disabled:opacity-50"
         >
@@ -177,23 +193,8 @@ function CaseRail({
           </div>
           <div className="mt-1 text-xs text-ink-3">or .txt exports / photos — read locally, extracted with Gemini; scans go through OCR</div>
         </button>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.txt,.md,image/*"
-          className="hidden"
-          onChange={(e) => {
-            if (e.target.files?.length) onFiles(e.target.files)
-            e.target.value = ''
-          }}
-        />
         {uploadNote && <p className="mt-2 text-xs leading-relaxed text-ink-3">{uploadNote}</p>}
-        <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-3">
-          {storedPersonalKey()
-            ? 'Using your Gemini key — live extraction on.'
-            : 'Managed key — live extraction on. Add your own in Settings (top right) to override.'}
-        </p>
+        <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-3">{extractionKeyNote()}</p>
       </div>
 
       <SavedCases current={current} onPick={onPick} />
@@ -299,10 +300,10 @@ function Waterfall({ v }: { v: Verdict }) {
   )
 }
 
-function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
+function VerdictPanel({ c, v, moves }: { c: CaseFile; v: Verdict; moves: ClaimMove[] }) {
   return (
     <div className="space-y-10">
-      <div className="flex flex-wrap items-center gap-8 border-b border-line pb-8">
+      <div id="verdict" className="flex scroll-mt-24 flex-wrap items-center gap-8 border-b border-line pb-8">
         <div aria-live="polite" className="h-[120px] w-[120px] overflow-hidden lg:h-[188px] lg:w-[188px]">
           <div className="origin-top-left scale-[0.64] lg:scale-100">
             <ScoreStamp score={v.score} band={v.band} />
@@ -329,6 +330,8 @@ function VerdictPanel({ c, v }: { c: CaseFile; v: Verdict }) {
           </ul>
         </div>
       </div>
+
+      <ClaimMoves moves={moves} />
 
       <div>
         <PanelTitle right={<span className="font-mono text-[10px] text-crimson-deep">{v.flags.length} flags</span>}>
@@ -634,6 +637,26 @@ function stripEdited(lines: EditableLine[]): BillLine[] {
   }))
 }
 
+/** The sample tab and an uploaded file are different cases. Switching tabs restores the other. */
+type DeskSnapshot = {
+  baseline: CaseFile
+  lines: EditableLine[]
+  letter: string
+  analysis: RejectionVerdict | null
+  rejectionDate: string
+}
+
+function snapFromCase(c: CaseFile): DeskSnapshot {
+  return {
+    baseline: c,
+    lines: toEditable(c.episode.billLines),
+    letter: c.rejectionLetter ?? '',
+    analysis: c.rejectionLetter ? analyzeRejection(c, c.rejectionLetter) : null,
+    rejectionDate:
+      (c.rejectionLetter ? parseRejectionDate(c.rejectionLetter) : null) ?? new Date().toISOString().slice(0, 10),
+  }
+}
+
 /** Input guard: amounts are always finite, non-negative numbers. */
 function clampAmount(raw: string): number {
   const n = Number(raw)
@@ -744,7 +767,17 @@ function BillLedger({
 
 /* ---------- the desk ---------- */
 
-export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
+export function Workbench({
+  initialCaseId,
+  pane,
+  onPane,
+  paneActionsRef,
+}: {
+  initialCaseId?: string
+  pane: DeskPane
+  onPane: (pane: DeskPane) => void
+  paneActionsRef: { current: (next: DeskPane) => void }
+}) {
   const [baseline, setBaseline] = useState<CaseFile>(
     () => SAMPLE_CASES.find((c) => c.id === initialCaseId) ?? SAMPLE_CASES[0],
   )
@@ -762,6 +795,13 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
   const [busy, setBusy] = useState(false)
   const [uploadNote, setUploadNote] = useState<string | null>(null)
   const [busyNote, setBusyNote] = useState<string | null>(null)
+  // The bar starts at Upload. A sample is an example, not a finished scan.
+  const [phase, setPhase] = useState<DeskPhase>('upload')
+  const [tab, setTab] = useState<DeskPhase>('upload')
+  const [ownFile, setOwnFile] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const stashedUser = useRef<DeskSnapshot | null>(null)
+  const stashedSample = useRef<DeskSnapshot | null>(null)
 
   // The editor owns bill lines; everything downstream (verdict, Hindi summary,
   // grievance, export) derives from this single recomputed CaseFile.
@@ -793,16 +833,81 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
     () => (analysis ? buildGrievanceLetter(caseFile, analysis, rejectionDate) : null),
     [analysis, caseFile, rejectionDate],
   )
+  const moves = useMemo(
+    () => claimMoves(caseFile, verdict, analysis),
+    [caseFile, verdict, analysis],
+  )
+  const stepStatus = useMemo(() => {
+    if (busy) return busyNote ?? 'Reading your documents. The next step opens on its own.'
+    if (tab === 'scan') {
+      return phase === 'results'
+        ? 'This file is already scanned. Choose another set of papers to run it again.'
+        : 'The scan starts the moment the files are in, and Result opens when it finishes.'
+    }
+    if (tab === 'upload') return 'Choose the policy and the bill. The bar moves to Scan, then Result, on its own.'
+    if (!ownFile) return 'The score lands here when the scan finishes. You do not have to open this step yourself.'
+    const raises = moves.filter((m) => m.impact === 'raise' && m.id !== 'ready')
+    if (moves[0]?.id === 'ready') return 'Scan complete. Nothing to add — this file is ready to submit.'
+    if (raises.length > 0) {
+      return `Scan complete. ${raises.length} suggestion${raises.length === 1 ? '' : 's'} below would raise the chance this claim is paid.`
+    }
+    return 'Scan complete. The result below shows what the policy will deduct.'
+  }, [busy, busyNote, tab, phase, ownFile, moves])
 
-  const pick = (c: CaseFile) => {
-    setBaseline(c)
-    setLines(toEditable(c.episode.billLines))
-    setLetter(c.rejectionLetter ?? '')
-    setAnalysis(c.rejectionLetter ? analyzeRejection(c, c.rejectionLetter) : null)
-    setRejectionDate(
-      (c.rejectionLetter ? parseRejectionDate(c.rejectionLetter) : null) ??
-        new Date().toISOString().slice(0, 10),
-    )
+  const capture = (): DeskSnapshot => ({ baseline, lines, letter, analysis, rejectionDate })
+
+  const applySnap = (s: DeskSnapshot) => {
+    setBaseline(s.baseline)
+    setLines(s.lines)
+    setLetter(s.letter)
+    setAnalysis(s.analysis)
+    setRejectionDate(s.rejectionDate)
+  }
+
+  const sampleSeed = () =>
+    stashedSample.current ?? snapFromCase(SAMPLE_CASES.find((c) => c.id === initialCaseId) ?? SAMPLE_CASES[0])
+
+  const onTab = (next: DeskPhase) => {
+    if (busy || next === tab) return
+    setTab(next)
+  }
+
+  // The header calls this. Switching to the example must not move the three-step bar.
+  // Assigned after render so the click handler always closes over the latest desk.
+  useEffect(() => {
+    paneActionsRef.current = (next) => {
+      if (busy || next === pane) return
+      // Leave the example first, so Previous scans never overwrites the uploaded file.
+      if (pane === 'sample' && next !== 'sample' && ownFile && stashedUser.current) {
+        stashedSample.current = capture()
+        applySnap(stashedUser.current)
+      }
+      if (next === 'sample' && ownFile && pane !== 'sample') {
+        stashedUser.current = capture()
+        applySnap(sampleSeed())
+      }
+      onPane(next)
+    }
+  })
+
+  const pick = (c: CaseFile, source?: 'sample' | 'upload' | 'stored') => {
+    const fromSample = source === 'sample' || (source === undefined && SAMPLE_CASES.some((s) => s.id === c.id))
+    if (fromSample) {
+      const snap = snapFromCase(c)
+      stashedSample.current = snap
+      if (ownFile && pane !== 'sample') stashedUser.current = capture()
+      applySnap(snap)
+      onPane('sample')
+      return
+    }
+    if (!ownFile || pane === 'sample') stashedSample.current = capture()
+    const snap = snapFromCase(c)
+    stashedUser.current = snap
+    applySnap(snap)
+    setOwnFile(true)
+    setPhase('results')
+    setTab('results')
+    onPane('claim')
   }
 
   const onAnalyze = async () => {
@@ -824,12 +929,31 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
   }
 
   const onFiles = async (files: FileList) => {
+    // Copy before the input is cleared. FileList is live and empties with the control.
+    const chosen = Array.from(files)
     const key = loadGeminiKey()
+    const startedOnSample = pane === 'sample'
     setBusy(true)
+    setPhase('scan')
+    setTab('scan')
+    onPane('claim')
     setUploadNote(null)
+    const finishFailed = () => {
+      if (ownFile) {
+        if (startedOnSample && stashedUser.current) {
+          stashedSample.current = capture()
+          applySnap(stashedUser.current)
+        }
+        setPhase('results')
+        setTab('results')
+        return
+      }
+      setPhase('upload')
+      setTab('upload')
+    }
     try {
       const docs = []
-      for (const f of Array.from(files)) {
+      for (const f of chosen) {
         const d = await fileToDocTextSmart(f, {
           extractPdfText: pdfToText,
           ocr: async (file) => {
@@ -848,16 +972,22 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
       const empty = docs.filter((d) => d.text.trim().length < 40)
       if (empty.length === docs.length) {
         setUploadNote('Could not read any text from those files — even with OCR. Try a sharper photo or a text export.')
+        finishFailed()
         return
       }
       const extracted = await extractCaseWithGemini(key, docs)
-      pick({ ...extracted, rejectionLetter: extracted.rejectionLetter })
+      pick(extracted, 'upload')
+      if (caseStore.loadConsent()) {
+        // Upsert sessions/{sessionId}/cases/{caseId}. The sidecar stamps savedAt and expireAt.
+        caseStore.saveCase(extracted.id, extracted.claimant, JSON.stringify(extracted)).catch(() => {})
+      }
       const ocrCount = docs.filter((d) => d.ocr).length
       setUploadNote(
         `Read ${docs.length} document${docs.length > 1 ? 's' : ''}${ocrCount ? ` (${ocrCount} via OCR)` : ''} — verdict rebuilt from your file.`,
       )
     } catch (err) {
       setUploadNote(err instanceof Error ? err.message : 'Extraction failed — the sample files still work.')
+      finishFailed()
     } finally {
       setBusy(false)
       setBusyNote(null)
@@ -873,46 +1003,121 @@ export function Workbench({ initialCaseId }: { initialCaseId?: string }) {
     URL.revokeObjectURL(a.href)
   }
 
+  const chooseFiles = () => {
+    inputRef.current?.click()
+  }
+
+  const desk = (showSamples: boolean) => (
+    <div className="grid gap-8 border-t border-line px-5 py-6 md:px-7 lg:grid-cols-[280px_1fr_360px]">
+      <aside aria-label="Case files and policy terms" className="min-w-0">
+        <CaseRail
+          current={caseFile}
+          onPick={pick}
+          onAskUpload={chooseFiles}
+          busy={busy}
+          busyNote={busyNote}
+          uploadNote={uploadNote}
+          showSamples={showSamples}
+        />
+      </aside>
+
+      <main className={`min-w-0 space-y-10 transition-opacity motion-reduce:transition-none ${busy ? 'opacity-60' : ''}`} aria-busy={busy}>
+        <VerdictPanel c={caseFile} v={verdict} moves={moves} />
+        <BillLedger lines={lines} onChange={setLines} onReset={() => setLines(toEditable(baseline.episode.billLines))} dirty={linesDirty} />
+      </main>
+
+      <aside aria-label="Rejection desk, letter and summaries" className="min-w-0 space-y-8">
+        <RejectionDesk
+          letter={letter}
+          setLetter={setLetter}
+          rejectionDate={rejectionDate}
+          setRejectionDate={setRejectionDate}
+          analysis={analysis}
+          aiBusy={aiBusy}
+          onAnalyze={onAnalyze}
+          hindiLines={hindiRejection}
+          ladder={ladder}
+        />
+        <GrievancePanel text={grievance} />
+        <HindiPanel lines={hindi} />
+        <div>
+          <PanelTitle>Export</PanelTitle>
+          <button
+            type="button"
+            onClick={exportJson}
+            className="min-h-11 w-full rounded-full border border-ink/40 py-2.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
+          >
+            Download case JSON
+          </button>
+          <p className="mt-3 font-mono text-[10px] leading-relaxed text-ink-3">
+            Assistive analysis, not insurance or legal advice. Verify every figure against your own documents.
+          </p>
+        </div>
+      </aside>
+    </div>
+  )
+
   return (
-    <div className="mx-auto max-w-shell px-6 py-8">
-      <div className="grid gap-8 lg:grid-cols-[280px_1fr_360px]" data-print-hidden>
-        <aside aria-label="Case files and policy terms" className="min-w-0">
-          <CaseRail current={caseFile} onPick={pick} onFiles={onFiles} busy={busy} busyNote={busyNote} uploadNote={uploadNote} />
-        </aside>
-
-        <main className="min-w-0 space-y-10">
-          <VerdictPanel c={caseFile} v={verdict} />
-          <BillLedger lines={lines} onChange={setLines} onReset={() => setLines(toEditable(baseline.episode.billLines))} dirty={linesDirty} />
-        </main>
-
-        <aside aria-label="Rejection desk, letter and summaries" className="min-w-0 space-y-8">
-          <RejectionDesk
-            letter={letter}
-            setLetter={setLetter}
-            rejectionDate={rejectionDate}
-            setRejectionDate={setRejectionDate}
-            analysis={analysis}
-            aiBusy={aiBusy}
-            onAnalyze={onAnalyze}
-            hindiLines={hindiRejection}
-            ladder={ladder}
-          />
-          <GrievancePanel text={grievance} />
-          <HindiPanel lines={hindi} />
-          <div>
-            <PanelTitle>Export</PanelTitle>
-            <button
-              onClick={exportJson}
-              className="min-h-11 w-full rounded-full border border-ink/40 py-2.5 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
-            >
-              Download case JSON
-            </button>
-            <p className="mt-3 font-mono text-[10px] leading-relaxed text-ink-3">
-              Assistive analysis, not insurance or legal advice. Verify every figure against your own documents.
+    <div className="mx-auto max-w-shell px-6 py-8" data-pane={pane}>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept=".pdf,.txt,.md,image/*"
+        className="hidden"
+        aria-label="Upload policy and bill"
+        onChange={(e) => {
+          if (e.target.files?.length) onFiles(e.target.files)
+          e.target.value = ''
+        }}
+      />
+      {pane === 'previous' ? (
+        <PreviousScans onOpen={(c) => pick(c, 'stored')} />
+      ) : pane === 'sample' ? (
+        <section id={deskPanel('sample')} aria-label="Sample scan" data-print-hidden className="border border-line">
+          <div className="bg-paper-2 px-5 py-5 md:px-7">
+            <h2 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Sample scan</h2>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-3">
+              Three fictional claims — a room-rent trap, a clean file, and a rejection. Your own upload still starts at the first step, and the bar moves forward on its own.
             </p>
+            <button
+              type="button"
+              onClick={() => paneActionsRef.current('claim')}
+              className="mt-4 inline-flex min-h-11 items-center rounded-full bg-chart px-5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink shadow-[0_1px_0_var(--ink)] transition-transform duration-150 hover:-translate-y-0.5"
+            >
+              Upload your own
+            </button>
           </div>
-        </aside>
-      </div>
+          {desk(true)}
+        </section>
+      ) : (
+        <ProgressSteps
+          mode="progress"
+          phase={phase}
+          tab={tab}
+          onTab={onTab}
+          status={stepStatus}
+          uploadDisabled={busy}
+          onUpload={chooseFiles}
+        >
+          {tab === 'upload' && (
+            <div id="your-documents" className="scroll-mt-24 border-t border-line px-5 py-6 md:px-7">
+              <button
+                type="button"
+                onClick={chooseFiles}
+                disabled={busy}
+                className="w-full border border-dashed border-ink/40 px-6 py-14 text-center transition-colors duration-150 hover:bg-paper-2/60 disabled:opacity-50"
+              >
+                <div className="font-display text-3xl font-semibold">Drop the policy and the bill</div>
+                <div className="mt-2 text-sm text-ink-3">PDF, text, or a photo. Choosing them moves the bar to Scan, then to Result.</div>
+              </button>
+              {uploadNote && <p className="mt-3 text-sm leading-relaxed text-ink-3">{uploadNote}</p>}
+              <p className="mt-3 font-mono text-[10px] leading-relaxed text-ink-3">{extractionKeyNote()}</p>
+            </div>
+          )}
+          {tab === 'results' && ownFile && desk(false)}
+        </ProgressSteps>
+      )}
       {grievance && <PrintLetter text={grievance} />}
     </div>
   )

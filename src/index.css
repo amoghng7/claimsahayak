@@ -173,6 +173,36 @@
   }
 }
 
+/* desk progress: the chart rule travels to the live step; a sheen runs while the scan is in flight */
+.step-fill {
+  transition: width 0.55s cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+.step-marker {
+  transition: left 0.55s cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+@keyframes desk-sheen {
+  from {
+    transform: translateX(-130%);
+  }
+  to {
+    transform: translateX(430%);
+  }
+}
+.desk-sheen {
+  animation: desk-sheen 1.15s ease-in-out infinite;
+}
+@keyframes desk-flash {
+  0% {
+    box-shadow: 0 0 0 3px var(--chart);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.desk-flash {
+  animation: desk-flash 1.15s ease-out;
+}
+
 /* staggered verdict reveal — one orchestrated sequence, not scattered fades */
 @keyframes rise {
   from {
@@ -199,8 +229,14 @@
 @media (prefers-reduced-motion: reduce) {
   .stamp-ring,
   .pulse-dot,
-  .rise {
+  .rise,
+  .desk-sheen,
+  .desk-flash {
     animation: none !important;
+  }
+  .step-fill,
+  .step-marker {
+    transition: none !important;
   }
   html {
     scroll-behavior: auto;

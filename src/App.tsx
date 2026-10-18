@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { DESK_PANES, type DeskPane } from './components/deskNav'
+import { HelpSheet } from './components/HelpSheet'
 import { Landing } from './sections/Landing'
 import { Workbench } from './sections/Workbench'
 import { caseStore } from './engine/store'
@@ -152,22 +154,45 @@ function SettingsSheet({
 export default function App() {
   const [view, setView] = useState<'landing' | 'desk'>('landing')
   const [initialCase, setInitialCase] = useState<string | undefined>()
+  const [deskPane, setDeskPane] = useState<DeskPane>('claim')
+  const deskPaneActionsRef = useRef<(next: DeskPane) => void>(() => {})
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [keyState, refreshKeyState] = useKeyState()
   const keyLabel =
     keyState === 'personal' ? 'Your key' : keyState === 'managed' ? 'Managed key' : 'No key'
 
   const openDesk = (caseId?: string) => {
     setInitialCase(caseId)
+    setDeskPane(caseId ? 'sample' : 'claim')
     setView('desk')
     window.scrollTo({ top: 0 })
   }
 
+  const onDeskKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = Math.max(0, DESK_PANES.findIndex((pane) => pane.id === deskPane))
+    const next =
+      e.key === 'ArrowRight' || e.key === 'ArrowDown'
+        ? (i + 1) % DESK_PANES.length
+        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+          ? (i + DESK_PANES.length - 1) % DESK_PANES.length
+          : e.key === 'Home'
+            ? 0
+            : e.key === 'End'
+              ? DESK_PANES.length - 1
+              : -1
+    if (next < 0) return
+    e.preventDefault()
+    const id = DESK_PANES[next].id
+    deskPaneActionsRef.current(id)
+    document.getElementById(`desk-pane-${id}`)?.focus()
+  }
+
   return (
     <div className="min-h-screen">
-      {/* inert while the settings dialog is open — background is unreachable
+      {/* inert while a dialog is open — background is unreachable
           to pointer, keyboard and screen-reader browse, not just aria-modal */}
-      <div inert={settingsOpen}>
+      <div inert={settingsOpen || helpOpen}>
         <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-sm" data-print-hidden>
           <div className="mx-auto flex max-w-shell flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3.5">
             <button onClick={() => setView('landing')} className="flex items-baseline gap-2.5">
@@ -204,22 +229,71 @@ export default function App() {
               )}
             </nav>
           </div>
+          {view === 'desk' && (
+            <div className="border-t border-line">
+              <div role="tablist" aria-label="Desk" className="mx-auto flex max-w-shell overflow-x-auto px-6" onKeyDown={onDeskKey}>
+                {DESK_PANES.map((pane) => {
+                  const selected = deskPane === pane.id
+                  return (
+                    <button
+                      key={pane.id}
+                      id={`desk-pane-${pane.id}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      aria-controls={pane.panel}
+                      tabIndex={selected ? 0 : -1}
+                      onClick={() => deskPaneActionsRef.current(pane.id)}
+                      className={`relative min-h-11 shrink-0 whitespace-nowrap px-4 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                        selected ? 'text-ink' : 'text-ink-3 hover:text-ink'
+                      }`}
+                    >
+                      {pane.label}
+                      <span
+                        className={`absolute inset-x-4 bottom-0 h-0.5 origin-left bg-chart transition-transform duration-200 motion-reduce:transition-none ${
+                          selected ? 'scale-x-100' : 'scale-x-0'
+                        }`}
+                        aria-hidden
+                      />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </header>
 
         {view === 'landing' ? (
           <Landing onOpen={() => openDesk()} onSample={(id) => openDesk(id)} />
         ) : (
-          <Workbench key={initialCase ?? 'default'} initialCaseId={initialCase} />
+          <Workbench
+            key={initialCase ?? 'default'}
+            initialCaseId={initialCase}
+            pane={deskPane}
+            onPane={setDeskPane}
+            paneActionsRef={deskPaneActionsRef}
+          />
         )}
 
-        <footer className="border-t border-line" data-print-hidden>
+        <footer className="border-t border-line pb-20" data-print-hidden>
           <div className="mx-auto flex max-w-shell flex-col gap-2 px-6 py-6 font-mono text-[10.5px] leading-relaxed text-ink-3 sm:flex-row sm:items-center sm:justify-between">
             <span>CLAIMSAHAYAK · GOOGLE CLOUD AI BUILDER CUP 2026 · JAPAC</span>
             <span>Sample cases are fictional. Assistive analysis — not insurance or legal advice.</span>
           </div>
         </footer>
+        <button
+          type="button"
+          onClick={() => setHelpOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={helpOpen}
+          data-print-hidden
+          className="fixed bottom-5 right-5 z-40 inline-flex min-h-11 items-center rounded-full bg-chart px-5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink shadow-[0_1px_0_var(--ink)] transition-transform duration-150 hover:-translate-y-0.5 motion-reduce:transition-none"
+        >
+          Help
+        </button>
       </div>
 
+      {helpOpen && <HelpSheet keyState={keyState} onClose={() => setHelpOpen(false)} />}
       {settingsOpen && (
         <SettingsSheet onClose={() => setSettingsOpen(false)} onSaved={refreshKeyState} />
       )}

@@ -66,16 +66,15 @@ const UNREADABLE_ERROR =
   'The document could not be read reliably — try a clearer scan or enter the details manually.'
 
 /**
- * One JSON-mode Gemini call. Shared by the extraction path and any other
- * structured-output feature (e.g. the rejection-letter classifier) — the
- * caller supplies the responseSchema and does its own validation/retries.
+ * JSON-mode call shared by extraction and the rejection classifier.
+ * The caller supplies the responseSchema and validates the text.
  */
 export async function requestGeminiJson(
   apiKey: string,
   prompt: string,
   responseSchema: object,
 ): Promise<string> {
-  const body = {
+  const json = await callGemini(apiKey, {
     contents: [
       {
         role: 'user',
@@ -87,11 +86,35 @@ export async function requestGeminiJson(
       responseSchema,
       temperature: 0,
     },
-  }
+  })
+  const text = candidateText(json)
+  if (!text) throw new Error('Gemini returned no content — try clearer scans, or use a sample case.')
+  return text
+}
 
+/**
+ * Prose call for the help clerk. Same proxy and key routing as JSON mode;
+ * no response schema, because the clerk explains the desk and never returns
+ * a figure the rules engine would have to trust.
+ */
+export async function requestGeminiText(
+  apiKey: string,
+  body: {
+    systemInstruction: { parts: { text: string }[] }
+    contents: { role: 'user' | 'model'; parts: { text: string }[] }[]
+    generationConfig: { temperature: number; maxOutputTokens: number }
+  },
+): Promise<string> {
+  const json = await callGemini(apiKey, body)
+  const text = candidateText(json)
+  if (!text) throw new Error('The help clerk returned no answer. Try rephrasing the question.')
+  return text
+}
+
+async function callGemini(apiKey: string, body: object): Promise<unknown> {
   const url = apiKey === 'PROXY'
     ? '/api/gemini/generate'
-    : `${ENDPOINT}?key=${encodeURIComponent(apiKey)}`;
+    : `${ENDPOINT}?key=${encodeURIComponent(apiKey)}`
 
   const res = await fetch(url, {
     method: 'POST',
@@ -120,10 +143,19 @@ export async function requestGeminiJson(
     throw new Error(`Gemini request failed (${res.status}). ${detail.slice(0, 160)}`)
   }
 
-  const json = await res.json()
-  const text: string | undefined = json?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('Gemini returned no content — try clearer scans, or use a sample case.')
-  return text
+  return res.json()
+}
+
+function candidateText(json: unknown): string | undefined {
+  if (!json || typeof json !== 'object') return undefined
+  const candidates = (json as { candidates?: unknown }).candidates
+  if (!Array.isArray(candidates)) return undefined
+  const first = candidates[0]
+  if (!first || typeof first !== 'object') return undefined
+  const parts = (first as { content?: { parts?: { text?: unknown }[] } }).content?.parts
+  if (!Array.isArray(parts)) return undefined
+  const text = parts.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('').trim()
+  return text || undefined
 }
 
 function toCaseFile(data: z.infer<typeof extractionSchema>): CaseFile {
