@@ -26,12 +26,12 @@ export function ClaimMoves({ moves }: { moves: ClaimMove[] }) {
             key={m.id}
             className={`flag${m.impact === 'know' ? ' warn' : ' good'} bg-paper-2/60 px-4 py-3`}
           >
-            <div className="flex items-baseline justify-between gap-3">
-              <div className="text-sm font-medium">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <div className="min-w-0 text-sm font-medium">
                 <span className="mr-1.5 font-mono text-[11px] text-ink-3">{i + 1}.</span>
                 {m.title}
               </div>
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-ink-3">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-ink-3">
                 {m.impact === 'raise' ? 'Raises the chance' : 'Fixed by the policy'}
               </span>
             </div>

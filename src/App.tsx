@@ -72,8 +72,8 @@ function SettingsSheet({
     onClose()
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" onClick={onClose} onKeyDown={onKeyDown} data-print-hidden>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Settings" className="panel w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:items-center sm:p-4" onClick={onClose} onKeyDown={onKeyDown} data-print-hidden>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Settings" className="panel max-h-[min(92dvh,40rem)] w-full max-w-md overflow-y-auto p-5 sm:p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-2xl font-semibold">Settings</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-3">
           The desk uses a secure managed backend key to extract data from your uploaded PDFs.
@@ -96,7 +96,7 @@ function SettingsSheet({
             Your key is in use: {maskKey(stored)}
           </p>
         )}
-        <div className="mt-5 flex gap-3">
+        <div className="mt-5 flex flex-wrap gap-3">
           <button
             onClick={() => {
               saveGeminiKey(draft.trim())
@@ -189,22 +189,22 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="app-frame flex min-h-dvh flex-col">
       {/* inert while a dialog is open — background is unreachable
           to pointer, keyboard and screen-reader browse, not just aria-modal */}
-      <div inert={settingsOpen || helpOpen}>
+      <div inert={settingsOpen || helpOpen} className="app-frame flex min-h-dvh flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-sm" data-print-hidden>
-          <div className="mx-auto flex max-w-shell flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3.5">
+          <div className="mx-auto flex max-w-shell flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 sm:gap-x-4 sm:px-6 sm:py-3.5">
             <button onClick={() => setView('landing')} className="flex items-baseline gap-2.5">
               <span className="font-display text-[22px] font-semibold leading-none">ClaimSahayak</span>
               <span className="hidden font-mono text-[10.5px] uppercase tracking-[0.14em] text-ink-3 sm:inline">
                 / claim readiness desk
               </span>
             </button>
-            <nav aria-label="Primary" className="flex items-center gap-2.5">
+            <nav aria-label="Primary" className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setSettingsOpen(true)}
-                className="flex min-h-11 items-center gap-2 rounded-full border border-ink/40 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
+                className="flex min-h-11 items-center gap-2 rounded-full border border-ink/40 px-3 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2 sm:px-4"
               >
                 <span
                   className="h-1.5 w-1.5 rounded-full"
@@ -215,14 +215,14 @@ export default function App() {
               {view === 'landing' ? (
                 <button
                   onClick={() => openDesk()}
-                  className="inline-flex min-h-11 items-center rounded-full bg-chart px-5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-150 hover:-translate-y-0.5"
+                  className="inline-flex min-h-11 items-center rounded-full bg-chart px-3.5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-150 hover:-translate-y-0.5 sm:px-5"
                 >
                   Open the desk →
                 </button>
               ) : (
                 <button
                   onClick={() => setView('landing')}
-                  className="inline-flex min-h-11 items-center rounded-full border border-ink/40 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
+                  className="inline-flex min-h-11 items-center rounded-full border border-ink/40 px-3.5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2 sm:px-5"
                 >
                   ← Overview
                 </button>
@@ -231,7 +231,7 @@ export default function App() {
           </div>
           {view === 'desk' && (
             <div className="border-t border-line">
-              <div role="tablist" aria-label="Desk" className="mx-auto flex max-w-shell overflow-x-auto px-6" onKeyDown={onDeskKey}>
+              <div role="tablist" aria-label="Desk" className="mx-auto flex max-w-shell overflow-x-auto px-1 sm:px-6" onKeyDown={onDeskKey}>
                 {DESK_PANES.map((pane) => {
                   const selected = deskPane === pane.id
                   return (
@@ -244,13 +244,13 @@ export default function App() {
                       aria-controls={pane.panel}
                       tabIndex={selected ? 0 : -1}
                       onClick={() => deskPaneActionsRef.current(pane.id)}
-                      className={`relative min-h-11 shrink-0 whitespace-nowrap px-4 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                      className={`relative min-h-11 shrink-0 whitespace-nowrap px-2 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] sm:px-4 sm:tracking-[0.14em] ${
                         selected ? 'text-ink' : 'text-ink-3 hover:text-ink'
                       }`}
                     >
                       {pane.label}
                       <span
-                        className={`absolute inset-x-4 bottom-0 h-0.5 origin-left bg-chart transition-transform duration-200 motion-reduce:transition-none ${
+                        className={`absolute inset-x-2 bottom-0 h-0.5 origin-left bg-chart transition-transform duration-200 motion-reduce:transition-none sm:inset-x-4 ${
                           selected ? 'scale-x-100' : 'scale-x-0'
                         }`}
                         aria-hidden
@@ -263,22 +263,24 @@ export default function App() {
           )}
         </header>
 
-        {view === 'landing' ? (
-          <Landing onOpen={() => openDesk()} onSample={(id) => openDesk(id)} />
-        ) : (
-          <Workbench
-            key={initialCase ?? 'default'}
-            initialCaseId={initialCase}
-            pane={deskPane}
-            onPane={setDeskPane}
-            paneActionsRef={deskPaneActionsRef}
-          />
-        )}
+        <div className="flex-1">
+          {view === 'landing' ? (
+            <Landing onOpen={() => openDesk()} onSample={(id) => openDesk(id)} />
+          ) : (
+            <Workbench
+              key={initialCase ?? 'default'}
+              initialCaseId={initialCase}
+              pane={deskPane}
+              onPane={setDeskPane}
+              paneActionsRef={deskPaneActionsRef}
+            />
+          )}
+        </div>
 
-        <footer className="border-t border-line pb-20" data-print-hidden>
-          <div className="mx-auto flex max-w-shell flex-col gap-2 px-6 py-6 font-mono text-[10.5px] leading-relaxed text-ink-3 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="mt-auto border-t border-line bg-paper pb-[env(safe-area-inset-bottom)]" data-print-hidden>
+          <div className="mx-auto flex max-w-shell flex-col gap-1.5 py-4 pl-4 pr-20 font-mono text-[10.5px] leading-relaxed text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:py-5 sm:pl-6 sm:pr-32">
             <span>CLAIMSAHAYAK · GOOGLE CLOUD AI BUILDER CUP 2026 · JAPAC</span>
-            <span>Sample cases are fictional. Assistive analysis — not insurance or legal advice.</span>
+            <span className="sm:text-right">Sample cases are fictional. Assistive analysis — not insurance or legal advice.</span>
           </div>
         </footer>
         <button
@@ -286,10 +288,12 @@ export default function App() {
           onClick={() => setHelpOpen(true)}
           aria-haspopup="dialog"
           aria-expanded={helpOpen}
+          aria-label="Help"
           data-print-hidden
-          className="fixed bottom-5 right-5 z-40 inline-flex min-h-11 items-center rounded-full bg-chart px-5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink shadow-[0_1px_0_var(--ink)] transition-transform duration-150 hover:-translate-y-0.5 motion-reduce:transition-none"
+          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full bg-chart font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink shadow-[0_1px_0_var(--ink)] transition-transform duration-150 hover:-translate-y-0.5 motion-reduce:transition-none sm:h-auto sm:w-auto sm:min-h-11 sm:px-5"
         >
-          Help
+          <span className="sm:hidden" aria-hidden>?</span>
+          <span className="hidden sm:inline">Help</span>
         </button>
       </div>
 

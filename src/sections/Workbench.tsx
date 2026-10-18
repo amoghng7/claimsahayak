@@ -219,8 +219,8 @@ function CaseRail({
             ['Since', formatDate(current.policy.inceptionDate)],
           ].map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3 border-b border-dashed border-line-faint py-1.5">
-              <dt className="text-ink-3">{k}</dt>
-              <dd className="text-right">{v}</dd>
+              <dt className="shrink-0 text-ink-3">{k}</dt>
+              <dd className="min-w-0 text-right break-words">{v}</dd>
             </div>
           ))}
         </dl>
@@ -234,13 +234,13 @@ function CaseRail({
 function FlagRow({ flag, delay }: { flag: DeductionFlag; delay: number }) {
   return (
     <div className={`flag${flag.severity === 'medium' ? ' warn' : ''} rise bg-paper-2/60 pl-4 pr-3 py-3`} style={{ animationDelay: `${delay}ms` }}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <div className="font-medium text-sm">{flag.title}</div>
           <p className="mt-1 text-[13px] leading-relaxed text-ink-3">{flag.detail}</p>
           <p className="mt-2 font-mono text-[10.5px] leading-relaxed text-ink-3/80">{flag.clause}</p>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 sm:text-right">
           <div className="font-mono text-sm font-semibold text-crimson-deep">−{formatINR(flag.amountAtRisk)}</div>
           <div className="font-mono text-[10px] uppercase tracking-wider text-ink-3">at risk</div>
         </div>
@@ -266,22 +266,22 @@ function Waterfall({ v }: { v: Verdict }) {
     ['Expected settlement', p.expected, 'color-mix(in srgb, var(--mint) 55%, var(--paper))', false],
   )
   return (
-    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Settlement waterfall — scroll horizontally">
+    <div role="region" aria-label="Settlement waterfall">
       <div className="ledger font-mono text-[12.5px]">
         {rows.map(([label, amount, color, signed], i) => {
           const last = i === rows.length - 1
           return (
-            <div key={label} className="rise min-w-[560px]" style={{ animationDelay: `${i * 70}ms` }}>
+            <div key={label} className="rise" style={{ animationDelay: `${i * 70}ms` }}>
               {i > 0 && <div className="waterfall-join ml-2 h-3" aria-hidden />}
-              <div className="flex items-center justify-between gap-4 pr-3 py-2.5 border border-line" style={{ background: last ? color : 'transparent' }}>
+              <div className="flex flex-col gap-1 border border-line py-2.5 pr-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4" style={{ background: last ? color : 'transparent' }}>
                 <span
-                  className={`sticky left-0 pl-3 pr-2 ${last ? 'font-semibold' : 'text-ink-3'}`}
-                  style={{ background: last ? color : 'var(--paper)' }}
+                  className={`pl-3 pr-2 ${last ? 'font-semibold' : 'text-ink-3'}`}
+                  style={{ background: last ? color : 'transparent' }}
                 >
                   {label}
                 </span>
-                <span className="flex items-center gap-3 whitespace-nowrap">
-                  <span className="inline-block h-2 w-16" aria-hidden>
+                <span className="flex items-center gap-3 whitespace-nowrap pl-3 sm:pl-0">
+                  <span className="inline-block h-2 w-12 sm:w-16" aria-hidden>
                     <span
                       className="block h-full"
                       style={{ width: `${Math.max(2, (Math.abs(amount) / p.total) * 100)}%`, background: color }}
@@ -303,28 +303,28 @@ function Waterfall({ v }: { v: Verdict }) {
 function VerdictPanel({ c, v, moves }: { c: CaseFile; v: Verdict; moves: ClaimMove[] }) {
   return (
     <div className="space-y-10">
-      <div id="verdict" className="flex scroll-mt-24 flex-wrap items-center gap-8 border-b border-line pb-8">
-        <div aria-live="polite" className="h-[120px] w-[120px] overflow-hidden lg:h-[188px] lg:w-[188px]">
+      <div id="verdict" className="flex scroll-mt-24 flex-col items-start gap-6 border-b border-line pb-8 sm:flex-row sm:flex-wrap sm:items-center sm:gap-8">
+        <div aria-live="polite" className="h-[120px] w-[120px] shrink-0 overflow-hidden lg:h-[188px] lg:w-[188px]">
           <div className="origin-top-left scale-[0.64] lg:scale-100">
             <ScoreStamp score={v.score} band={v.band} />
           </div>
         </div>
-        <div className="min-w-56 flex-1">
+        <div className="min-w-0 flex-1">
           <span aria-live="polite" className={`inline-block rounded-full px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] ${BAND_CHIP[v.band]}`}>
             {BAND_LABEL[v.band]}
           </span>
           <h2 className="mt-3 font-display text-3xl font-semibold leading-tight">{c.claimant}</h2>
-          <p className="mt-1 font-mono text-[12px] text-ink-3">
+          <p className="mt-1 break-words font-mono text-[12px] text-ink-3">
             {c.episode.hospital}, {c.episode.city} · {formatDate(c.episode.admissionDate)} → {formatDate(c.episode.dischargeDate)} · {c.episode.diagnosis}
           </p>
           <ul className="mt-4 space-y-1.5">
             {v.reasons.map((r, i) => (
-              <li key={i} className="flex items-center gap-2.5 text-[13.5px]">
+              <li key={i} className="flex items-start gap-2.5 text-[13.5px]">
                 <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
+                  className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
                   style={{ background: r.ok ? 'color-mix(in srgb, var(--mint) 70%, var(--ink))' : 'var(--crimson)' }}
                 />
-                <span className={r.ok ? 'text-ink-3' : ''}>{r.label}</span>
+                <span className={r.ok ? 'min-w-0 text-ink-3' : 'min-w-0'}>{r.label}</span>
               </li>
             ))}
           </ul>
@@ -712,30 +712,32 @@ function BillLedger({
       >
         Bill lines — check the extraction
       </PanelTitle>
-      <div className="border border-line overflow-x-auto" tabIndex={0} role="region" aria-label="Bill lines editor — scroll horizontally">
+      <div className="border border-line" role="region" aria-label="Bill lines editor">
         {lines.map((l, i) => (
           <div
             key={i}
-            className="flex flex-nowrap items-center gap-2 pr-3 py-2 min-w-[640px] border-b border-line-faint last:border-0"
+            className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-line-faint px-3 py-2 last:border-0 md:flex md:min-w-0 md:flex-wrap md:gap-2 md:pr-3"
           >
             <input
               value={l.head}
               aria-label="Line item"
               onChange={(e) => update(i, { head: e.target.value })}
-              className="sticky left-0 w-44 shrink-0 bg-paper pl-3 text-[13px] focus:outline-none focus:ring-1 focus:ring-brick lg:w-auto lg:min-w-40 lg:flex-1"
+              className="col-span-2 w-full min-w-0 bg-paper text-[13px] focus:outline-none focus:ring-1 focus:ring-brick md:w-44 md:flex-1 md:bg-transparent lg:min-w-40"
             />
             {l.edited && (
-              <span className="font-mono text-[9px] uppercase tracking-wider text-brick">edited</span>
+              <span className="col-span-2 font-mono text-[9px] uppercase tracking-wider text-brick md:col-span-1">edited</span>
             )}
-            <Toggle on={l.roomLinked} label="room-linked" onClick={() => update(i, { roomLinked: !l.roomLinked })} />
-            <Toggle on={!!l.nonPayable} label="non-payable" onClick={() => update(i, { nonPayable: !l.nonPayable })} />
+            <div className="col-span-2 flex flex-wrap gap-2 md:contents">
+              <Toggle on={l.roomLinked} label="room-linked" onClick={() => update(i, { roomLinked: !l.roomLinked })} />
+              <Toggle on={!!l.nonPayable} label="non-payable" onClick={() => update(i, { nonPayable: !l.nonPayable })} />
+            </div>
             <input
               type="number"
               min={0}
               value={l.amount}
               aria-label="Amount"
               onChange={(e) => update(i, { amount: clampAmount(e.target.value) })}
-              className="w-28 bg-transparent text-right font-mono text-[12.5px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brick"
+              className="w-full min-w-0 bg-transparent text-right font-mono text-[12.5px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brick md:w-28"
             />
             <button
               type="button"
@@ -747,7 +749,7 @@ function BillLedger({
             </button>
           </div>
         ))}
-        <div className="flex items-center justify-between gap-4 border-t border-line bg-paper-2/60 px-3 py-2.5 min-w-[640px]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-paper-2/60 px-3 py-2.5">
           <button
             type="button"
             onClick={() => onChange([...lines, { head: 'New charge', amount: 0, roomLinked: false, edited: true }])}
@@ -1008,7 +1010,7 @@ export function Workbench({
   }
 
   const desk = (showSamples: boolean) => (
-    <div className="grid gap-8 border-t border-line px-5 py-6 md:px-7 lg:grid-cols-[280px_1fr_360px]">
+    <div className="grid gap-8 border-t border-line px-4 py-5 sm:px-5 sm:py-6 md:px-7 lg:grid-cols-[280px_minmax(0,1fr)_360px]">
       <aside aria-label="Case files and policy terms" className="min-w-0">
         <CaseRail
           current={caseFile}
@@ -1058,7 +1060,7 @@ export function Workbench({
   )
 
   return (
-    <div className="mx-auto max-w-shell px-6 py-8" data-pane={pane}>
+    <div className="mx-auto max-w-shell px-4 py-6 sm:px-6 sm:py-8" data-pane={pane}>
       <input
         ref={inputRef}
         type="file"
@@ -1075,7 +1077,7 @@ export function Workbench({
         <PreviousScans onOpen={(c) => pick(c, 'stored')} />
       ) : pane === 'sample' ? (
         <section id={deskPanel('sample')} aria-label="Sample scan" data-print-hidden className="border border-line">
-          <div className="bg-paper-2 px-5 py-5 md:px-7">
+          <div className="bg-paper-2 px-4 py-5 sm:px-5 md:px-7">
             <h2 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Sample scan</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-3">
               Three fictional claims — a room-rent trap, a clean file, and a rejection. Your own upload still starts at the first step, and the bar moves forward on its own.
@@ -1101,14 +1103,14 @@ export function Workbench({
           onUpload={chooseFiles}
         >
           {tab === 'upload' && (
-            <div id="your-documents" className="scroll-mt-24 border-t border-line px-5 py-6 md:px-7">
+            <div id="your-documents" className="scroll-mt-24 border-t border-line px-4 py-6 sm:px-5 md:px-7">
               <button
                 type="button"
                 onClick={chooseFiles}
                 disabled={busy}
-                className="w-full border border-dashed border-ink/40 px-6 py-14 text-center transition-colors duration-150 hover:bg-paper-2/60 disabled:opacity-50"
+                className="w-full border border-dashed border-ink/40 px-4 py-10 text-center transition-colors duration-150 hover:bg-paper-2/60 disabled:opacity-50 sm:px-6 sm:py-14"
               >
-                <div className="font-display text-3xl font-semibold">Drop the policy and the bill</div>
+                <div className="font-display text-2xl font-semibold sm:text-3xl">Drop the policy and the bill</div>
                 <div className="mt-2 text-sm text-ink-3">PDF, text, or a photo. Choosing them moves the bar to Scan, then to Result.</div>
               </button>
               {uploadNote && <p className="mt-3 text-sm leading-relaxed text-ink-3">{uploadNote}</p>}

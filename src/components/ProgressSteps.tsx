@@ -111,7 +111,7 @@ function DeskProgress({
       data-tab={tab}
       data-print-hidden
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-5 pt-5 md:px-7">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 px-4 pt-5 sm:px-5 md:px-7">
         <Kicker ok={phase === 'results'}>{kicker}</Kicker>
         <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-ink-3">Nothing else to learn</span>
       </div>
@@ -148,11 +148,11 @@ function DeskProgress({
                 aria-current={item.id === phase ? 'step' : undefined}
                 tabIndex={isSelected ? 0 : -1}
                 onClick={() => open(item.id)}
-                className={`group relative px-3 py-3 text-left transition-colors duration-150 motion-reduce:transition-none sm:px-4 sm:py-4 ${
+                className={`group relative min-w-0 px-2 py-3 text-left transition-colors duration-150 motion-reduce:transition-none sm:px-4 sm:py-4 ${
                   isSelected ? 'bg-paper-2' : 'hover:bg-paper-2/70 active:bg-paper-3'
                 } ${i > 0 ? 'border-l border-line' : ''}`}
               >
-                <span className="font-display text-4xl leading-none text-ink md:text-5xl">
+                <span className="font-display text-3xl leading-none text-ink sm:text-4xl md:text-5xl">
                   <span className="relative inline-block">
                     {(isSelected || state === 'current') && (
                       <span className="absolute -inset-x-1 bottom-[0.12em] top-[58%] bg-chart transition-opacity" aria-hidden />
@@ -160,7 +160,7 @@ function DeskProgress({
                     <span className="relative">{item.no}</span>
                   </span>
                 </span>
-                <span className="mt-2 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em]">
+                <span className="mt-2 flex items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] sm:text-[11px] sm:tracking-[0.14em]">
                   {state === 'current' && phase === 'scan' && <span className="pulse-dot" aria-hidden />}
                   <span className="sm:hidden">{item.short}</span>
                   <span className="hidden sm:inline">{item.title}</span>
@@ -179,13 +179,13 @@ function DeskProgress({
       </div>
 
       {status && (
-        <p aria-live="polite" className="border-t border-line px-5 py-3.5 text-sm leading-relaxed text-ink-3 md:px-7">
+        <p aria-live="polite" className="border-t border-line px-4 py-3.5 text-sm leading-relaxed text-ink-3 sm:px-5 md:px-7">
           {status}
         </p>
       )}
 
       <div role="tabpanel" id={DESK_PANEL_ID} aria-labelledby={`${baseId}-tab-${tab}`} key={tab} className="rise border-t border-line">
-        <div className="bg-paper-2 px-5 py-5 md:px-7">
+        <div className="bg-paper-2 px-4 py-5 sm:px-5 md:px-7">
           <h3 className="font-display text-2xl font-semibold leading-tight md:text-3xl">{step.title}</h3>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-3">{panelCopy(tab, phase)}</p>
           <div className="mt-4 flex flex-wrap gap-3">

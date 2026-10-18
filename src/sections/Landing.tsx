@@ -6,34 +6,34 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
   return (
     <main>
       {/* ——— Hero: asymmetric editorial split, dossier card floating right ——— */}
-      <section aria-labelledby="hero" className="mx-auto max-w-shell px-8 pt-16 pb-20 md:pt-24">
+      <section aria-labelledby="hero" className="mx-auto max-w-shell px-4 pb-12 pt-10 sm:px-6 sm:pb-16 sm:pt-16 md:px-8 md:pt-24">
         <Kicker>Google Cloud AI Builder Cup · JAPAC 2026</Kicker>
-        <div className="mt-8 grid gap-12 md:grid-cols-[1.25fr_1fr] md:gap-16 items-start">
-          <div>
+        <div className="mt-8 grid items-start gap-10 md:grid-cols-[1.25fr_1fr] md:gap-16">
+          <div className="min-w-0">
             <h1
               id="hero"
               className="font-display font-semibold leading-[1.02]"
-              style={{ fontSize: 'clamp(44px, 5.6vw, 68px)', letterSpacing: '-0.028em' }}
+              style={{ fontSize: 'clamp(2rem, 7vw + 0.5rem, 4.25rem)', letterSpacing: '-0.028em' }}
             >
               The insurer read your policy.{' '}
               <em className="font-display">Did you?</em>
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-3">
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-ink-3 sm:text-lg">
               ClaimSahayak reads your policy schedule and hospital bill the way a claims
               assessor would — then shows you the deduction traps, the missing paperwork,
               and the letter to write back. Before the rejection, not after.
             </p>
-            <div className="mt-10 flex flex-wrap items-center gap-4">
+            <div className="mt-8 flex flex-col items-stretch gap-3 sm:mt-10 sm:flex-row sm:flex-wrap sm:items-center">
               <button
                 onClick={onOpen}
-                className="rounded-full bg-chart px-7 py-3.5 font-mono text-[13px] font-semibold uppercase tracking-[0.08em] text-ink transition-transform duration-150 hover:-translate-y-0.5"
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-chart px-6 py-3 font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-ink transition-transform duration-150 hover:-translate-y-0.5 sm:px-7 sm:py-3.5 sm:text-[13px]"
                 style={{ boxShadow: '0 1px 0 var(--ink)' }}
               >
                 Open the readiness desk →
               </button>
               <button
                 onClick={() => onSample('ramesh-iyer')}
-                className="rounded-full border border-ink/40 px-7 py-3.5 font-mono text-[13px] uppercase tracking-[0.08em] text-ink transition-colors duration-150 hover:bg-paper-2"
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-ink/40 px-6 py-3 font-mono text-[12px] uppercase tracking-[0.08em] text-ink transition-colors duration-150 hover:bg-paper-2 sm:px-7 sm:py-3.5 sm:text-[13px]"
               >
                 See the room-rent trap
               </button>
@@ -41,26 +41,26 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
           </div>
 
           {/* floating dossier card — the product, not a stock photo */}
-          <div className="panel-2 p-6 md:mt-10 rotate-[0.6deg]">
-            <div className="flex items-center justify-between border-b border-line pb-3">
-              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+          <div className="panel-2 min-w-0 p-4 sm:p-6 md:mt-10 md:rotate-[0.6deg]">
+            <div className="flex items-start justify-between gap-3 border-b border-line pb-3">
+              <span className="min-w-0 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
                 Case file · NA/HC/21/884532
               </span>
-              <span className="font-mono text-[11px] text-crimson-deep">FLAGGED</span>
+              <span className="shrink-0 font-mono text-[11px] text-crimson-deep">FLAGGED</span>
             </div>
-            <div className="flex items-center gap-6 py-5">
-              <ScoreStamp score={53} band="fair" size={132} />
-              <div className="space-y-2 font-mono text-[12px] leading-relaxed">
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-crimson" />
+            <div className="flex flex-col items-start gap-4 py-5 sm:flex-row sm:items-center sm:gap-6">
+              <ScoreStamp score={53} band="fair" size={120} />
+              <div className="min-w-0 space-y-2 font-mono text-[12px] leading-relaxed">
+                <div className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-crimson" />
                   Room-rent trap · −₹75,750
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-crimson" />
+                <div className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-crimson" />
                   2 mandatory documents missing
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--mint)' }} />
+                <div className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--mint)' }} />
                   Waiting periods served
                 </div>
               </div>
@@ -71,18 +71,18 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
           </div>
         </div>
 
-        <div className="mt-16 border-t border-line pt-14 md:mt-20">
+        <div className="mt-12 border-t border-line pt-12 sm:mt-16 sm:pt-14 md:mt-20">
           <ProgressSteps mode="promise" headingId="how-simple" />
         </div>
 
         {/* fact strip — hairline-separated, mono figures */}
-        <div className="mt-16 grid gap-px border border-line bg-line md:grid-cols-3">
+        <div className="mt-12 grid gap-px border border-line bg-line sm:mt-16 md:grid-cols-3">
           {[
             ['≈40%', 'of health-claim rejections trace to documentation and procedural lapses — the most reversible class of all'],
             ['1% of SI / day', 'the room-rent cap buried in most retail policies — breach it and every linked charge shrinks proportionally'],
             ['5 years', 'the moratorium after which an insurer can no longer repudiate for non-disclosure, except on proven fraud'],
           ].map(([fig, text]) => (
-            <div key={fig} className="bg-paper px-7 py-6">
+            <div key={fig} className="bg-paper px-5 py-5 sm:px-7 sm:py-6">
               <div className="font-mono text-2xl font-semibold">{fig}</div>
               <p className="mt-2 text-sm leading-relaxed text-ink-3">{text}</p>
             </div>
@@ -91,7 +91,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
       </section>
 
       {/* ——— Numbered editorial sections ——— */}
-      <section className="mx-auto max-w-shell px-8 py-16 space-y-20">
+      <section className="mx-auto max-w-shell space-y-12 px-4 py-12 sm:space-y-16 sm:px-6 sm:py-16 md:space-y-20 md:px-8">
         <NumberedSection no="01" id="section-01" title="The trap nobody reads">
           <p>
             Pick a room one category above your sub-limit and the insurer doesn&apos;t just
@@ -135,7 +135,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
 
       {/* ——— Dark section: how the desk thinks ——— */}
       <section aria-labelledby="principle" className="bg-ink text-paper">
-        <div className="mx-auto max-w-shell px-8 py-20">
+        <div className="mx-auto max-w-shell px-4 py-14 sm:px-6 sm:py-16 md:px-8 md:py-20">
           <span className="kicker" style={{ color: 'color-mix(in srgb, var(--paper) 65%, transparent)' }}>
             <span className="pulse-dot ok" style={{ background: 'var(--chart)' }} aria-hidden />
             Design principle
@@ -145,7 +145,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
             <em style={{ color: 'var(--chart)' }}>Words, grounded.</em>
           </h2>
           <div className="mt-12 grid gap-px md:grid-cols-2" style={{ background: 'color-mix(in srgb, var(--paper) 18%, transparent)' }}>
-            <div className="bg-ink p-8">
+            <div className="bg-ink p-5 sm:p-8">
               <div className="font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--chart)' }}>
                 The rules engine
               </div>
@@ -155,7 +155,7 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
                 A model can read your documents; it is never allowed to invent your policy.
               </p>
             </div>
-            <div className="bg-ink p-8">
+            <div className="bg-ink p-5 sm:p-8">
               <div className="font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: 'var(--chart)' }}>
                 The language layer
               </div>
@@ -170,14 +170,14 @@ export function Landing({ onOpen, onSample }: { onOpen: () => void; onSample: (i
       </section>
 
       {/* ——— closing strip ——— */}
-      <section aria-labelledby="cta" className="mx-auto max-w-shell px-8 py-16 flex flex-col items-start gap-6">
-        <h2 id="cta" className="font-display font-semibold leading-tight" style={{ fontSize: 'clamp(28px, 3.4vw, 44px)' }}>
+      <section aria-labelledby="cta" className="mx-auto flex max-w-shell flex-col items-stretch gap-6 px-4 py-12 sm:items-start sm:px-6 sm:py-16 md:px-8">
+        <h2 id="cta" className="font-display font-semibold leading-tight" style={{ fontSize: 'clamp(1.75rem, 3.4vw + 0.5rem, 2.75rem)' }}>
           Your claim is a document problem.{' '}
           <em>Solve it like one.</em>
         </h2>
         <button
           onClick={onOpen}
-          className="rounded-full bg-ink px-7 py-3.5 font-mono text-[13px] font-semibold uppercase tracking-[0.08em] text-paper transition-transform duration-150 hover:-translate-y-0.5"
+          className="inline-flex min-h-11 items-center justify-center rounded-full bg-ink px-6 py-3 font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-paper transition-transform duration-150 hover:-translate-y-0.5 sm:px-7 sm:py-3.5 sm:text-[13px]"
         >
           Open the readiness desk →
         </button>

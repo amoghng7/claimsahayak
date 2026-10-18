@@ -53,6 +53,9 @@
   }
   html {
     scroll-behavior: smooth;
+    scroll-padding-bottom: 4.5rem;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   body {
     background: var(--paper);
@@ -60,6 +63,10 @@
     font-family: "Instrument Sans", "Noto Sans Devanagari", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
+  #root {
+    min-height: 100dvh;
   }
   ::selection {
     background: var(--chart);
@@ -96,9 +103,12 @@
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--ink-3);
-    display: inline-flex;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    column-gap: 0.5rem;
+    row-gap: 0.25rem;
+    max-width: 100%;
   }
   .pulse-dot {
     width: 7px;
@@ -253,8 +263,12 @@
     margin: 18mm;
   }
   html,
-  body {
+  body,
+  #root,
+  .app-frame {
     background: #fff !important;
+    min-height: 0 !important;
+    display: block !important;
   }
   body {
     -webkit-print-color-adjust: exact;

@@ -23,12 +23,12 @@ export function NumberedSection({
   children: ReactNode
 }) {
   return (
-    <section aria-labelledby={id} className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 md:gap-x-10">
-      <div className="font-display text-5xl md:text-7xl leading-none text-ink/25 select-none" aria-hidden>
+    <section aria-labelledby={id} className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 sm:gap-x-6 md:gap-x-10">
+      <div className="font-display text-4xl sm:text-5xl md:text-7xl leading-none text-ink/25 select-none" aria-hidden>
         {no}
       </div>
-      <div>
-        <h2 id={id} className="font-display text-2xl md:text-4xl leading-tight mb-3">{title}</h2>
+      <div className="min-w-0">
+        <h2 id={id} className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight mb-3">{title}</h2>
         <div className="text-ink-3 leading-relaxed max-w-2xl">{children}</div>
       </div>
     </section>
@@ -38,7 +38,7 @@ export function NumberedSection({
 /** Panel heading row used across the workbench. */
 export function PanelTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-line pb-2 mb-3">
+    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line pb-2">
       <h3 className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">{children}</h3>
       {right}
     </div>

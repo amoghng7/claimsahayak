@@ -59,13 +59,13 @@ export function PreviousScans({ onOpen }: { onOpen: (c: CaseFile) => void }) {
 
   return (
     <section id={deskPanel('previous')} aria-label="Previous scans" data-print-hidden className="border border-line">
-      <div className="bg-paper-2 px-5 py-5 md:px-7">
+      <div className="bg-paper-2 px-4 py-5 sm:px-5 md:px-7">
         <h2 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Previous scans</h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-3">
           A finished scan is kept for 30 days under an anonymous session, and only after you turn on “Save my cases on the server” in Settings.
         </p>
       </div>
-      <div className="px-5 py-6 md:px-7">
+      <div className="px-4 py-6 sm:px-5 md:px-7">
         {!consent && (
           <p className="max-w-xl text-sm leading-relaxed text-ink-3">
             Server save is off, so nothing from this browser is stored. Turn it on in Settings and the next finished scan will appear here.

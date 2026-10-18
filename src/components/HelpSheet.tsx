@@ -113,13 +113,13 @@ export function HelpSheet({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={noteId}
-        className="flex h-full w-full max-w-lg flex-col border-l border-line bg-paper outline-none"
+        className="flex h-dvh max-h-dvh w-full max-w-lg flex-col border-l border-line bg-paper outline-none"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-          <div>
+        <div className="flex items-start justify-between gap-4 border-b border-line px-4 py-4 sm:px-5">
+          <div className="min-w-0">
             <Kicker ok>Help</Kicker>
-            <h2 id={titleId} className="mt-2 font-display text-3xl font-semibold leading-none">
+            <h2 id={titleId} className="mt-2 font-display text-2xl font-semibold leading-none sm:text-3xl">
               Desk clerk
             </h2>
           </div>
@@ -132,11 +132,11 @@ export function HelpSheet({
           </button>
         </div>
 
-        <p id={noteId} role="note" className="flag warn mx-5 mt-4 px-3 py-2.5 text-sm leading-relaxed text-ink">
+        <p id={noteId} role="note" className="flag warn mx-4 mt-4 px-3 py-2.5 text-sm leading-relaxed text-ink sm:mx-5">
           {HELP_DISCLAIMER} Not insurance or legal advice.
         </p>
 
-        <div ref={threadRef} className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4" aria-live="polite">
+        <div ref={threadRef} className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4 sm:px-5" aria-live="polite">
           {turns.length === 0 && !pending && (
             <div>
               <p className="max-w-md text-sm leading-relaxed text-ink-3">
@@ -188,7 +188,7 @@ export function HelpSheet({
         </div>
 
         <form
-          className="border-t border-line px-5 py-4"
+          className="border-t border-line px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-5"
           onSubmit={(e) => {
             e.preventDefault()
             void send(draft)
@@ -213,7 +213,7 @@ export function HelpSheet({
             placeholder="Ask about the desk"
             className="mt-1.5 w-full resize-none border border-line bg-paper-2 px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-brick disabled:opacity-60"
           />
-          <div className="mt-3 flex items-center justify-between gap-3">
+          <div className="mt-3 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="font-mono text-[10px] leading-relaxed text-ink-3">
               Cleared when you close Help. Not saved.
             </p>
