@@ -74,6 +74,11 @@ export function createCaseStore({ storage, fetchImpl, uuid }: CaseStoreDeps) {
       const data = (await res.json().catch(() => ({}))) as { message?: string; error?: string }
       throw new Error(data.message ?? data.error ?? `Request failed (HTTP ${res.status})`)
     }
+    // The dev SPA fallback answers unknown /api/* GETs with index.html and a
+    // 200; a non-JSON reply means the store is down, not that the list is data.
+    if (!(res.headers.get('content-type') ?? '').includes('application/json')) {
+      throw new Error('The case store is unavailable right now.')
+    }
     return res
   }
 

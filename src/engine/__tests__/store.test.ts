@@ -15,7 +15,10 @@ let uuidCounter = 0
 const fakeUuid = () => `00000000-0000-4000-8000-${String(++uuidCounter).padStart(12, '0')}`
 
 function okJson(body: unknown) {
-  return { ok: true, status: 200, json: async () => body } as Response
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 function makeStore(fetchImpl?: (url: string, init?: RequestInit) => Promise<Response>) {
@@ -103,6 +106,19 @@ describe('cases API', () => {
     const { store } = makeStore(async () => ({ ok: false, status: 503, json: async () => ({ message: 'FIRESTORE_PROJECT is not set' }) }) as Response)
     store.setConsent(true)
     await expect(store.listCases()).rejects.toThrow(/FIRESTORE_PROJECT/)
+  })
+
+  it('a non-JSON 200 (the dev SPA fallback answering /api/*) is not shown as a raw parse error', async () => {
+    const { store } = makeStore(
+      async () =>
+        new Response('<!doctype html><title>ClaimSahayak</title>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' },
+        }),
+    )
+    store.setConsent(true)
+    await expect(store.listCases()).rejects.toThrow(/unavailable/i)
+    await expect(store.listCases()).rejects.not.toThrow(/Unexpected token/)
   })
 })
 
