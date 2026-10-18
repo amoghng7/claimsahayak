@@ -1,9 +1,7 @@
 import type { BillLine, CaseFile, HospitalEpisode, Policy, PolicyExclusion } from './types'
 import { addMonths, daysBetween, formatDate, monthsBetween, yearsBetween } from './format'
 
-/* ------------------------------------------------------------------ */
-/* IRDAI-standard hospitalisation claim document checklist             */
-/* ------------------------------------------------------------------ */
+/* IRDAI-standard hospitalisation claim document checklist */
 
 export interface DocSpec {
   id: string
@@ -27,20 +25,13 @@ export const STANDARD_DOCS: DocSpec[] = [
   { id: 'implant', label: 'Implant sticker / invoice', mandatory: false, why: 'Required only where an implant was used.' },
 ]
 
-export interface MissingDoc extends DocSpec {
-  applicable: boolean
-}
-
-export function missingDocs(c: CaseFile): MissingDoc[] {
+export function missingDocs(c: CaseFile): DocSpec[] {
   return STANDARD_DOCS
     .filter((d) => !d.accidentOnly || c.episode.accidentRelated)
     .filter((d) => !c.providedDocIds.includes(d.id))
-    .map((d) => ({ ...d, applicable: true }))
 }
 
-/* ------------------------------------------------------------------ */
-/* Room-rent sub-limit & proportional deduction                        */
-/* ------------------------------------------------------------------ */
+/* Room-rent sub-limit and proportional deduction */
 
 /** ₹/day the policy allows, or null when there is no effective cap. */
 export function allowedRoomRent(policy: Policy): number | null {
@@ -60,24 +51,16 @@ export interface RoomRentAnalysis {
   proportionalCut: number
 }
 
-/**
- * IRDAI convention: ICU / intensive-care / ventilator charges are not subject
- * to the room-rent sub-limit or the proportionate deduction that follows it.
- */
+/** ICU, intensive-care, and ventilator lines skip the room-rent sub-limit
+ * and the proportionate deduction that follows it (IRDAI convention). */
 export const ICU_PATTERN = /icu|intensive care|ventilator/i
 
 export function isIcuLine(l: BillLine): boolean {
   return ICU_PATTERN.test(l.head)
 }
 
-/**
- * The trap: pick a room above your sub-limit and the insurer doesn't just
- * cut the room rent — it scales down every charge linked to room category
- * by the same ratio. Deterministic arithmetic; no model involved.
- *
- * `omit` excludes lines already fully deducted elsewhere (permanent
- * exclusions, PED waits) so they are never cut twice.
- */
+/** A room above the sub-limit is cut, and room-linked charges scale by the same ratio.
+ * `omit` skips lines already fully deducted, so they are never cut twice. */
 export function roomRentAnalysis(
   policy: Policy,
   ep: HospitalEpisode,
@@ -85,9 +68,8 @@ export function roomRentAnalysis(
 ): RoomRentAnalysis | null {
   const allowed = allowedRoomRent(policy)
   if (allowed === null) return null
-  // The bill's room lines are the source of truth for the actual rent (the
-  // ledger lets users correct them); episode fields are the fallback for
-  // bills with no room line at all.
+  // Room lines are the actual rent (the ledger can correct them).
+  // Episode fields are the fallback when the bill has no room line.
   const roomLines = ep.billLines.filter((l) => l.isRoomRent && !omit?.(l))
   const nonIcuRoom = roomLines.filter((l) => !isIcuLine(l))
   const actual =
@@ -103,9 +85,7 @@ export function roomRentAnalysis(
   return { allowed, actual, ratio, roomCut, proportionalCut }
 }
 
-/* ------------------------------------------------------------------ */
-/* Keyword matching (exclusions, PEDs, sub-limits)                     */
-/* ------------------------------------------------------------------ */
+/* Keyword matching for exclusions, PEDs, and sub-limits */
 
 /** Case-insensitive word-boundary match — "Hernia" must not fire on "Herniated". */
 function containsKeyword(text: string, keyword: string): boolean {
@@ -117,9 +97,7 @@ function containsKeyword(text: string, keyword: string): boolean {
   return new RegExp(`(?:^|[^a-z0-9])${esc}(?:[^a-z0-9]|$)`, 'i').test(text.toLowerCase())
 }
 
-/* ------------------------------------------------------------------ */
-/* Permanent exclusions                                                */
-/* ------------------------------------------------------------------ */
+/* Permanent exclusions */
 
 export interface ExclusionCheck {
   /** exclusion clause labels matched against the diagnosis / procedure */
@@ -145,9 +123,7 @@ export function exclusionCheck(policy: Policy, ep: HospitalEpisode): ExclusionCh
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* PED waiting period                                                  */
-/* ------------------------------------------------------------------ */
+/* PED waiting period */
 
 /** IRDAI (Insurance Products) Regulations 2024 — PED waits are capped at 36 months. */
 export const PED_WAIT_CAP_MONTHS = 36
@@ -221,9 +197,7 @@ export function pedWaitingCheck(policy: Policy, ep: HospitalEpisode): PedWaiting
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Waiting periods                                                     */
-/* ------------------------------------------------------------------ */
+/* Waiting periods */
 
 export interface WaitingFlag {
   breached: boolean
@@ -258,9 +232,7 @@ export function waitingPeriodCheck(c: CaseFile): WaitingFlag[] {
   return flags
 }
 
-/* ------------------------------------------------------------------ */
-/* Payable waterfall                                                   */
-/* ------------------------------------------------------------------ */
+/* Payable waterfall */
 
 export interface SubLimitCut {
   label: string
@@ -330,9 +302,7 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* Claim-readiness score                                               */
-/* ------------------------------------------------------------------ */
+/* Claim-readiness score */
 
 export type Band = 'strong' | 'fair' | 'weak'
 
@@ -354,7 +324,7 @@ export interface Verdict {
   score: number
   band: Band
   reasons: Reason[]
-  missing: MissingDoc[]
+  missing: DocSpec[]
   flags: DeductionFlag[]
   payable: PayableEstimate
   roomRent: RoomRentAnalysis | null
@@ -500,9 +470,7 @@ export function buildVerdict(c: CaseFile): Verdict {
   return { score, band, reasons, missing, flags, payable, roomRent: rr, waiting, exclusions, ped }
 }
 
-/* ------------------------------------------------------------------ */
-/* Rejection-letter analyser                                           */
-/* ------------------------------------------------------------------ */
+/* Rejection-letter analyser */
 
 export interface RejectionVerdict {
   patternId: string
@@ -670,11 +638,8 @@ function unknownRejection(): RejectionVerdict {
   }
 }
 
-/**
- * Re-run a known pattern's deterministic assessment by id — used by the AI
- * fallback classifier so the model picks the category but the engine still
- * writes the explanation, steps and clauses.
- */
+/** Re-runs a known pattern by id. The model may pick the category;
+ * this function still writes the explanation, steps, and clauses. */
 export function assessPattern(c: CaseFile, patternId: string): RejectionVerdict | null {
   const p = PATTERNS.find((p) => p.id === patternId)
   return p ? { patternId: p.id, reason: p.reason, ...p.assess(c) } : null

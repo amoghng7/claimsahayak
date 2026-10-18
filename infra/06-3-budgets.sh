@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Phase 06 step 6.3 — budget alert for the claim-sahayak project.
-# Usage: BUDGET_INR=1000 bash infra/06-3-budgets.sh
-# Emails billing account admins at 50/90/100% of actual spend.
+# Phase 06 step 6.3 — budget alert. Usage: BUDGET_INR=1000 bash infra/06-3-budgets.sh
+# Emails billing admins at 50/90/100% of actual spend.
 set -euo pipefail
 
 PROJECT=claim-sahayak

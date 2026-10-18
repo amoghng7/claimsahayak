@@ -17,9 +17,3 @@ export async function pdfToText(file: File): Promise<string> {
   await doc.destroy()
   return chunks.join('\n')
 }
-
-export async function fileToDocText(file: File): Promise<{ label: string; text: string }> {
-  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-  const text = isPdf ? await pdfToText(file) : await file.text()
-  return { label: file.name, text: text.slice(0, 30_000) }
-}

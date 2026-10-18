@@ -1,11 +1,7 @@
 import { z } from 'zod'
 
-/**
- * Validation boundary for Gemini's extraction output. The model may read the
- * documents, but nothing it produces enters the rules engine until it has
- * passed these schemas — money fields are non-negative numbers, enums match
- * the domain model in types.ts.
- */
+/** Gemini extraction must pass these schemas before the rules engine sees it.
+ * Money fields are non-negative; enums match the domain model. */
 
 export const roomRentSchema = z.object({
   type: z.enum(['percent_si', 'daily_cap', 'no_limit', 'single_room']),
@@ -73,13 +69,8 @@ export const extractionSchema = z.object({
   rejectionLetter: z.string().nullable(),
 })
 
-export type ExtractionPayload = z.infer<typeof extractionSchema>
-
-/**
- * Rejection-letter classification output (fallback path in rejection.ts).
- * The model only classifies; the six known categories mirror the pattern ids
- * in rules.ts so the deterministic assess step can re-run for a match.
- */
+/** Fallback classification. The model only picks a category.
+ * The six ids match rules.ts so the deterministic assess step can re-run. */
 export const REJECTION_CATEGORIES = [
   'ped-nondisclosure',
   'waiting',
@@ -97,8 +88,6 @@ export const rejectionClassifySchema = z.object({
   plainLanguageReason: z.string(),
 })
 
-export type RejectionClassification = z.infer<typeof rejectionClassifySchema>
-
 /** Mirrors rejectionClassifySchema — keep the two in sync. */
 export const REJECTION_RESPONSE_SCHEMA = {
   type: 'OBJECT',
@@ -111,11 +100,8 @@ export const REJECTION_RESPONSE_SCHEMA = {
   required: ['category', 'confidence', 'citedClause', 'plainLanguageReason'],
 } as const
 
-/**
- * OpenAPI-3-subset schema sent to Gemini as generationConfig.responseSchema,
- * so malformed output is rejected at the API level too. Mirrors the zod
- * schemas above — keep the two in sync.
- */
+/** responseSchema sent to Gemini so malformed JSON is rejected at the API.
+ * Mirrors the zod schemas above — keep the two in sync. */
 export const EXTRACTION_RESPONSE_SCHEMA = {
   type: 'OBJECT',
   properties: {

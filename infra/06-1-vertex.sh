@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Phase 06 step 6.1 — Vertex AI cutover for ClaimSahayak.
-# Enables Vertex AI and grants the Cloud Run runtime service account access.
-# The deploy itself happens via .github/workflows/deploy.yml on push to main.
-# Idempotent — safe to re-run.
+# Phase 06 step 6.1 — enable Vertex AI and grant the Cloud Run runtime SA.
+# Idempotent. Deploy itself is .github/workflows/deploy.yml on push to main.
 set -euo pipefail
 
 PROJECT=claim-sahayak

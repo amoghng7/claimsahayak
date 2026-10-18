@@ -1,13 +1,10 @@
 #!/bin/sh
-# ClaimSahayak container startup: sidecar first (Vertex AI proxy, 127.0.0.1:8081),
-# then the official nginx entrypoint (envsubst templates) with nginx as PID 1.
-# The health wait makes a missing/crashed sidecar visible in Cloud Run logs at
-# startup instead of as later 502s.
+# Sidecar first (127.0.0.1:8081), then nginx as PID 1.
+# A failed health check is logged at startup instead of as a later 502.
 set -e
 
-# Restart loop: a crashed sidecar must not leave /api/* 502ing on an
-# otherwise-"healthy" container. The health wait below covers boot; this
-# covers runtime.
+# Restart a crashed sidecar. The health wait covers boot; this covers runtime,
+# so /api/* does not 502 on a container that still looks healthy.
 (
   until node /app/server/index.js; do
     echo "start.sh: sidecar exited ($?) — restarting in 1s"

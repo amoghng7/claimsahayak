@@ -15,9 +15,8 @@ gcloud services enable firestore.googleapis.com storage.googleapis.com --project
 gcloud firestore databases create --location="$REGION" --type=firestore-native --project="$PROJECT" \
   2>&1 | grep -v "already exists" || true
 
-# Bucket with uniform bucket-level access, public access prevention, and a
-# 30-day auto-delete. PAP is what stops an allUsers binding from publishing
-# uploaded policy schedules and bills.
+# Uniform access, public-access prevention, and a 30-day delete.
+# PAP stops an allUsers binding from publishing uploaded schedules and bills.
 gcloud storage buckets create "gs://$BUCKET" --location="$REGION" --uniform-bucket-level-access \
   --public-access-prevention --project="$PROJECT" 2>&1 | grep -v "already exists" || true
 
@@ -35,9 +34,8 @@ gcloud projects add-iam-policy-binding "$PROJECT" \
 gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" \
   --member="serviceAccount:$RUNTIME_SA" --role="roles/storage.objectAdmin" > /dev/null
 
-# Firestore TTL on expireAt (server writes savedAt + 30d): documents are
-# deleted automatically once expireAt is in the past. REST because gcloud
-# beta/alpha components are unavailable on installer-based SDKs.
+# TTL on expireAt (savedAt + 30d). REST because gcloud beta/alpha
+# is unavailable on installer-based SDKs.
 TOKEN=$(gcloud auth print-access-token)
 curl -s -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   "https://firestore.googleapis.com/v1/projects/$PROJECT/databases/(default)/collectionGroups/cases/fields/expireAt?updateMask=ttlConfig" \

@@ -9,11 +9,8 @@ import {
 } from '../engine/help'
 import { loadGeminiKey, type KeyState } from '../engine/gemini'
 
-/**
- * Help is a clerk over the current screen, not a third page, so a scan in
- * progress stays mounted underneath. The transcript lives only while this
- * sheet is open.
- */
+/** Help sits over the current screen so a scan stays mounted.
+ * The transcript lives only while this sheet is open. */
 export function HelpSheet({
   keyState,
   onClose,

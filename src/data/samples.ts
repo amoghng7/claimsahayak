@@ -1,11 +1,7 @@
 import type { CaseFile } from '../engine/types'
 
-/**
- * Three synthetic case files powering demo mode.
- * All insurers, hospitals, policies and people are fictional; the policy
- * mechanics (1% SI room-rent cap, proportional deduction, moratorium,
- * 20% senior co-pay) mirror real Indian retail health policies.
- */
+/** Three synthetic demo cases. People, hospitals, and insurers are fictional.
+ * Room cap, proportional deduction, moratorium, and senior co-pay match retail policies. */
 
 export const SAMPLE_CASES: CaseFile[] = [
   {

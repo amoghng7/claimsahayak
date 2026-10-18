@@ -6,10 +6,7 @@ const BAND_META: Record<Band, { label: string; tone: string; ring: string }> = {
   weak: { label: 'Do not file yet', tone: 'var(--crimson)', ring: 'var(--crimson)' },
 }
 
-/**
- * The verdict stamp: a rotating circular-text ring around a big serif
- * score numeral — like the stamp a claims assessor slams on a dossier.
- */
+/** Verdict stamp: a rotating ring around the score numeral. */
 export function ScoreStamp({ score, band, size = 188 }: { score: number; band: Band; size?: number }) {
   const meta = BAND_META[band]
   const r = 44

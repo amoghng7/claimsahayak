@@ -26,11 +26,8 @@ function readBody(req: Connect.IncomingMessage): Promise<string> {
   })
 }
 
-// Dev parity for the nginx proxy in nginx.conf.template: same path, same
-// contract. Two modes: GEMINI_SIDECAR_URL set → forward to a locally running
-// sidecar (npm run dev:server, production-shaped); otherwise inject a dev key
-// server-side like the pre-Vertex nginx proxy did. Without a key we answer 428
-// so the app can show a friendly message instead of parsing the SPA fallback HTML.
+// Dev stand-in for the nginx Gemini proxy. GEMINI_SIDECAR_URL forwards to a local
+// sidecar; otherwise GEMINI_API_KEY is injected. Neither set → HTTP 428.
 function geminiDevProxy(apiKey: string | undefined, sidecarUrl: string | undefined): Plugin {
   return {
     name: 'gemini-dev-proxy',

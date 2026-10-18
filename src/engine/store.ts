@@ -1,9 +1,5 @@
-/**
- * Consent-gated server persistence (Phase 06 step 6.4). Default is OFF and
- * nothing leaves the browser — the session id itself is only created after
- * the user opts in, so an opted-out user is invisible to the backend.
- * Session is an anonymous UUID in localStorage; no accounts, no sign-in.
- */
+/** Server persistence is off until the user opts in. The session id is created
+ * only after consent, so an opted-out user never contacts the backend. */
 
 export interface KVStorage {
   getItem(key: string): string | null

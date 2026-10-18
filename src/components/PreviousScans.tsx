@@ -8,10 +8,8 @@ function newestFirst(list: StoredCaseMeta[]): StoredCaseMeta[] {
   return [...list].sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1))
 }
 
-/**
- * Consent-gated history. The score is not stored; opening a scan recomputes
- * it in the rules engine. Saved documents expire after 30 days.
- */
+/** Consent-gated history. Opening a scan recomputes the score.
+ * Saved documents expire after 30 days. */
 export function PreviousScans({ onOpen }: { onOpen: (c: CaseFile) => void }) {
   const consent = caseStore.loadConsent()
   const [cases, setCases] = useState<StoredCaseMeta[] | null>(null)

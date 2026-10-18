@@ -3,12 +3,8 @@ import { analyzeRejection, assessPattern, type RejectionVerdict } from './rules'
 import { REJECTION_RESPONSE_SCHEMA, rejectionClassifySchema } from './schemas'
 import { requestGeminiJson } from './gemini'
 
-/**
- * AI fallback for the rejection desk. The deterministic regex classifier in
- * rules.ts stays the primary path — Gemini is consulted only when no pattern
- * matches, and even then it only picks a category; the explanation, steps and
- * clauses are re-derived deterministically by the matched pattern's assess.
- */
+/** Gemini classifies a rejection only when no regex pattern matches.
+ * It picks a category; explanation, steps, and clauses stay deterministic. */
 
 /** Below this confidence the model's category is treated as advisory only. */
 const MIN_CONFIDENCE = 0.6
@@ -79,10 +75,6 @@ export async function analyzeRejectionWithFallback(
   return { ...base, aiAssisted: true, advisory: cls.plainLanguageReason }
 }
 
-/* ------------------------------------------------------------------ */
-/* Rejection-date parsing (for the escalation ladder)                  */
-/* ------------------------------------------------------------------ */
-
 const MONTHS: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
   jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
@@ -111,11 +103,8 @@ function parseDateText(text: string): string | null {
   return null
 }
 
-/**
- * The repudiation date, parsed from an explicit letterhead line only
- * ("Date: …", "Dated …"). Body dates — hospitalisation ranges, proposal
- * dates — are deliberately ignored; null means the UI should ask the user.
- */
+/** Repudiation date from a letterhead line only ("Date:" / "Dated").
+ * Dates in the body are ignored; null means the desk should ask. */
 export function parseRejectionDate(letter: string): string | null {
   for (const line of letter.split('\n')) {
     const m = /^\s*(?:date|dated)\s*[:\-.]?\s+(.+?)\s*$/i.exec(line)

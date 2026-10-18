@@ -1,10 +1,7 @@
 import { requestGeminiText } from './gemini'
 
-/**
- * Help clerk. Explains how the desk works. It never sees the open case and
- * never returns a figure: settlement, score, and flags stay in the rules engine.
- * The screen stamps HELP_DISCLAIMER on the panel and on every reply.
- */
+/** Help clerk. It never sees the open case and never returns a figure.
+ * Settlement, score, and flags stay in the rules engine. */
 
 export const HELP_DISCLAIMER =
   'This is an AI response. Cross-verify it against your policy and the figures on the desk.'

@@ -4,6 +4,7 @@ import {
   STANDARD_DOCS,
   analyzeRejection,
   buildVerdict,
+  type Band,
   type DeductionFlag,
   type RejectionVerdict,
   type Verdict,
@@ -12,7 +13,7 @@ import { analyzeRejectionWithFallback, parseRejectionDate } from '../engine/reje
 import { buildEscalationLadder, buildGrievanceLetter, type EscalationStep } from '../engine/grievance'
 import { hindiRejectionSummary, hindiSummary } from '../engine/hindi'
 import { formatINR, formatDate } from '../engine/format'
-import { fileToDocTextSmart, ocrFile } from '../engine/ocr'
+import { fileToDocTextSmart, MIN_TEXT_LAYER, ocrFile } from '../engine/ocr'
 import { pdfToText } from '../engine/pdf'
 import { caseStore, type StoredCaseMeta } from '../engine/store'
 import { extractCaseWithGemini, loadGeminiKey, storedPersonalKey } from '../engine/gemini'
@@ -25,12 +26,12 @@ import { PreviousScans } from '../components/PreviousScans'
 import { ProgressSteps, type DeskPhase } from '../components/ProgressSteps'
 import { ScoreStamp } from '../components/ScoreStamp'
 
-const BAND_CHIP: Record<string, string> = {
+const BAND_CHIP: Record<Band, string> = {
   strong: 'bg-mint text-ink',
   fair: 'bg-brick text-ink',
   weak: 'bg-crimson-deep text-paper',
 }
-const BAND_LABEL: Record<string, string> = {
+const BAND_LABEL: Record<Band, string> = {
   strong: 'Claim-ready',
   fair: 'File with fixes',
   weak: 'Do not file yet',
@@ -971,7 +972,7 @@ export function Workbench({
           caseStore.uploadDocument(f).catch(() => {})
         }
       }
-      const empty = docs.filter((d) => d.text.trim().length < 40)
+      const empty = docs.filter((d) => d.text.trim().length < MIN_TEXT_LAYER)
       if (empty.length === docs.length) {
         setUploadNote('Could not read those files, even with OCR. Try a sharper photo or a text export.')
         finishFailed()

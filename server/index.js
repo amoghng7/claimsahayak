@@ -1,12 +1,8 @@
 import http from 'node:http'
 import { GoogleAuth } from 'google-auth-library'
 
-// ClaimSahayak sidecar: same-origin backend inside the nginx container.
-// /generate re-implements the old nginx proxy against Vertex AI with
-// Application Default Credentials — no API key material anywhere; IAM and
-// Cloud Logging govern access. A successful response is the Vertex
-// generateContent JSON. The request is an allow-listed text call: tools,
-// safety-filter overrides, and oversized completions are not forwarded.
+// Same-origin sidecar. /generate calls Vertex AI with ADC — no API key.
+// The body is allow-listed text: tools, safety overrides, and huge completions are dropped.
 
 export function vertexUrl({ project, location, model }) {
   const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`
@@ -17,11 +13,8 @@ export function docaiUrl({ project, location, processor }) {
   return `https://${location}-documentai.googleapis.com/v1/projects/${project}/locations/${location}/processors/${processor}:process`
 }
 
-// Phase 06 step 6.4 — consent-gated persistence. Cases live under
-// sessions/{sessionId}/cases/{caseId}; the session id is a client-generated
-// UUID sent as X-Session-Id — anonymous, no accounts, created only after the
-// user opts in. Documents go to a GCS bucket with a 30-day lifecycle rule.
-// Version-4 only: the id is the bearer token, so nil/v1 UUIDs are rejected.
+// Consent-gated cases under sessions/{id}/cases. X-Session-Id is a v4 UUID
+// created only after opt-in; documents go to a GCS bucket with a 30-day lifecycle.
 const SESSION_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 // Sample ids are slugs (`ramesh-iyer`); live ids are `live-<epoch>`. Dots and
 // slashes are rejected so a case id cannot be a Firestore path segment.
@@ -34,6 +27,8 @@ const MAX_OCR_CHARS = 14_000_000
 const MAX_CASE_PAYLOAD = 400_000
 const MAX_CASE_NAME = 200
 const OCR_TEXT_CAP = 30_000
+// Firestore deletes the case once this timestamp is in the past.
+const CASE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const OCR_MIMES = new Set([
   'application/pdf',
   'image/jpeg',
@@ -70,9 +65,8 @@ function upstreamError(res, status, message) {
   json(res, code, { error: 'upstream_rejected', message })
 }
 
-// Browsers cannot spoof Sec-Fetch-Site, and a cross-site form cannot set
-// application/json or application/octet-stream. Missing headers stay allowed
-// so curl, the health probe, and the Vite dev forwarder keep working.
+// Browsers cannot spoof Sec-Fetch-Site, and a cross-site form cannot set JSON
+// or octet-stream. Missing headers stay allowed for curl, health, and the Vite proxy.
 function blocked(req, res, expectedType) {
   const site = String(req.headers['sec-fetch-site'] || '').toLowerCase()
   if (site === 'cross-site' || site === 'same-site') {
@@ -81,7 +75,7 @@ function blocked(req, res, expectedType) {
   }
   const origin = req.headers.origin
   if (origin) {
-    let originHost = ''
+    let originHost
     try {
       originHost = new URL(origin).host
     } catch {
@@ -110,9 +104,8 @@ function tooLarge(message) {
   return Object.assign(new Error(message), { status: 413 })
 }
 
-// Raw bytes. JSON routes decode with .toString('utf8') themselves; binary
-// routes (/api/uploads) must never pass through a string — UTF-8 decode +
-// re-encode would destroy any non-UTF-8 byte sequence (i.e. every real PDF).
+// Raw bytes. JSON routes decode UTF-8 themselves; binary uploads must stay a Buffer
+// or a PDF's non-UTF-8 bytes would be destroyed.
 function readBody(req, limit) {
   return new Promise((resolve, reject) => {
     const chunks = []
@@ -153,9 +146,8 @@ function textParts(parts) {
   return out
 }
 
-// The SPA builds the prompt, but the route is public. Rebuild an allow-listed
-// body so a caller cannot attach tools, disable safety filters, or ask for a
-// huge completion. Anything else is dropped.
+// The route is public, so rebuild an allow-listed body. Tools, safety overrides,
+// and oversized completions are dropped.
 export function buildGenerateBody(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return { error: 'bad_request' }
   if (!Array.isArray(payload.contents) || payload.contents.length === 0 || payload.contents.length > 12) {
@@ -368,9 +360,7 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
               fields: {
                 name: { stringValue: String(body.name ?? caseId).slice(0, MAX_CASE_NAME) },
                 savedAt: { timestampValue: new Date(now).toISOString() },
-                // TTL policy on expireAt (Firestore deletes docs whose TTL
-                // field is in the past) — the 30-day retention promise
-                expireAt: { timestampValue: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString() },
+                expireAt: { timestampValue: new Date(now + CASE_TTL_MS).toISOString() },
                 payload: { stringValue: payload },
               },
             }),

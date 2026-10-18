@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Phase 06 step 6.2 — Cloud Document AI OCR for scanned bills.
-# Creates an OCR processor and grants the Cloud Run runtime SA access.
-# Idempotent-ish: re-running prints the existing processor id instead of
-# creating duplicates when DOCAI_PROCESSOR_ID is already known (pass it).
+# Phase 06 step 6.2 — Document AI OCR processor and runtime SA access.
+# Pass DOCAI_PROCESSOR_ID to reprint an existing processor instead of creating one.
 set -euo pipefail
 
 PROJECT=claim-sahayak

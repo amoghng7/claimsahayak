@@ -1,15 +1,10 @@
 import { pdfToText } from './pdf'
 
-/**
- * OCR fallback for image-based documents (Phase 06 step 6.2). The browser has
- * no OCR; the sidecar's /api/ocr route runs Cloud Document AI. Documents still
- * never leave the user's control — they travel the same same-origin proxy path
- * as extraction text, and only when the local text layer is empty (or the file
- * is a photo). Returned text feeds the SAME Gemini extraction schema as a
- * digital PDF; no money math happens here or in the model.
- */
+/** OCR fallback when the text layer is empty or the file is a photo. Same-origin /api/ocr
+ * runs Document AI; that text then uses the same extraction schema. No money math here. */
 
-const MIN_TEXT_LAYER = 40 // below this the "text layer" is noise, not content
+export const MIN_TEXT_LAYER = 40 // below this the text layer is noise, not content
+const DOC_TEXT_CAP = 30_000
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = new Uint8Array(await file.arrayBuffer())
@@ -64,5 +59,5 @@ export async function fileToDocTextSmart(file: File, deps: SmartDeps = defaultDe
   } else {
     text = await file.text()
   }
-  return { label: file.name, text: text.slice(0, 30_000), ocr }
+  return { label: file.name, text: text.slice(0, DOC_TEXT_CAP), ocr }
 }

@@ -51,10 +51,8 @@ function reveal(id: string) {
 
 const TAB_ORDER: DeskPhase[] = ['upload', 'scan', 'results']
 
-/**
- * Desk only. The landing keeps the static three-station promise.
- * The bar follows the live phase. Sample scan lives in the page header.
- */
+/** Desk bar. It follows the live phase; the landing keeps a static promise.
+ * Sample scan lives in the page header. */
 function DeskProgress({
   phase,
   tab,
@@ -253,11 +251,8 @@ type ProgressStepsProps =
       children?: ReactNode
     }
 
-/**
- * The whole product, in three stations.
- * `promise` is the landing: every step is the offer, none is pending.
- * `progress` is the desk: a bar you can open and act on.
- */
+/** Three stations for the whole product. `promise` is the landing offer.
+ * `progress` is the desk bar you can open and act on. */
 export function ProgressSteps(props: ProgressStepsProps) {
   if (props.mode === 'progress') {
     const phase = props.phase ?? 'results'

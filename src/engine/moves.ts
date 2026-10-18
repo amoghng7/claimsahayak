@@ -2,12 +2,8 @@ import type { CaseFile } from './types'
 import type { RejectionVerdict, Verdict } from './rules'
 import { formatDate, formatINR } from './format'
 
-/**
- * Concrete next moves for a scanned file. Derived only from the rules
- * verdict — the model never decides what would raise the chance of payment.
- * "raise" is something the claimant can still do. "know" is already fixed
- * by the contract (room already used, co-pay, a permanent exclusion).
- */
+/** Next moves from the rules verdict only. The model never decides what would raise payment.
+ * "raise" is still in the claimant's hands; "know" is already fixed by the contract. */
 export interface ClaimMove {
   id: string
   title: string

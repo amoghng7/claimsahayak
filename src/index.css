@@ -2,11 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ------------------------------------------------------------------
-   ClaimSahayak design tokens — "the claims dossier"
-   Warm paper, forest ink, acid chart for action, mint/brick/crimson
-   for verdict semantics. No purple, no default UI fonts, no gradients-as-decor.
-------------------------------------------------------------------- */
+/* Claims dossier: warm paper, forest ink, chart for action, mint/brick/crimson for verdicts.
+   No purple, no default UI fonts, no gradients used as decoration. */
 
 @layer base {
   :root {
@@ -253,10 +250,7 @@
   }
 }
 
-/* ------------------------------------------------------------------
-   Print — the grievance letter is filed on paper. Only the letter
-   prints: ink on white A4, no paper texture, no chrome.
-------------------------------------------------------------------- */
+/* Print only the grievance letter: ink on white A4, no paper texture, no chrome. */
 @media print {
   @page {
     size: A4;

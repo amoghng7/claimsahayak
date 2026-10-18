@@ -2,12 +2,8 @@ import type { CaseFile } from './types'
 import type { RejectionVerdict } from './rules'
 import { addDays, addYears, formatDate, formatINR } from './format'
 
-/**
- * Deterministic grievance-letter drafter.
- * The letter is assembled from the case record and the rejection analysis —
- * every factual claim in it traces to an extracted field or a cited clause,
- * never to a model's imagination.
- */
+/** Drafts the grievance letter from the case and the rejection analysis.
+ * Every fact traces to an extracted field or a cited clause. */
 export function buildGrievanceLetter(c: CaseFile, rej: RejectionVerdict, rejectionDate?: string): string {
   const p = c.policy
   const ep = c.episode
@@ -84,10 +80,6 @@ Drafted by ClaimSahayak. Check every fact and figure against your own
 documents before sending. This letter is an assistive draft, not legal advice.`
 }
 
-/* ------------------------------------------------------------------ */
-/* Escalation ladder — dates computed from the repudiation date        */
-/* ------------------------------------------------------------------ */
-
 export interface EscalationStep {
   title: string
   /** ISO date the step's deadline/window is computed to, or null when none applies */
@@ -96,11 +88,8 @@ export interface EscalationStep {
   detail: string
 }
 
-/**
- * The four rungs of the IRDAI grievance route, dated from the repudiation.
- * Timelines per research-notes.md: PPI Master Circular 2024 (14-day insurer
- * TAT), Insurance Ombudsman Rules 2017 as amended by G.S.R. 828(E).
- */
+/** Four IRDAI grievance rungs, dated from the repudiation.
+ * Insurer TAT is 14 days (PPI 2024); the Ombudsman window follows G.S.R. 828(E). */
 export function buildEscalationLadder(rejectionDate: string): EscalationStep[] {
   const groDeadline = addDays(rejectionDate, 14)
   const ombudsmanOpens = addDays(rejectionDate, 30)

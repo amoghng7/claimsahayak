@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# Phase 06 step 6.3 — Cloud Monitoring alerts for ClaimSahayak.
-# Uses the Monitoring REST API directly (gcloud alpha requires the alpha
-# component, which installer-based Windows SDKs cannot update).
-# 1. 5xx rate on the Cloud Run service (any 5xx over 5 min → alert).
-# 2. Gemini usage spike: log-based metric counting /api/gemini/generate calls,
-#    alerting above SPIKE_PER_HOUR (default 100) per hour.
-# ALERT_EMAIL set → email notification channel attached; else policies are
-# created channel-less (visible in the console).
+# Phase 06 step 6.3 — 5xx and Gemini-spike alerts via the Monitoring REST API
+# (gcloud alpha is unavailable here). ALERT_EMAIL attaches a channel when set.
 set -euo pipefail
 
 PROJECT=claim-sahayak

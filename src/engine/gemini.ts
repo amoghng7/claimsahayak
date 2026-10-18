@@ -2,15 +2,8 @@ import type { CaseFile } from './types'
 import { EXTRACTION_RESPONSE_SCHEMA, extractionSchema } from './schemas'
 import type { z } from 'zod'
 
-/**
- * Live extraction path: raw document text → structured CaseFile via the
- * Gemini Developer API (gemini-3.8-flash, JSON mode). The browser talks to
- * Gemini directly with the user's own key; in a production deployment this
- * call moves server-side to Vertex AI on Google Cloud (see README).
- *
- * No key configured → the app stays fully usable in demo mode on the
- * bundled synthetic case files.
- */
+/** Document text → CaseFile via Gemini JSON mode. PROXY calls Vertex through the sidecar;
+ * a saved personal key calls the Developer API. Sample cases still run with no key. */
 
 const MODEL = 'gemini-3.8-flash'
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`
@@ -65,10 +58,7 @@ export interface DocText {
 const UNREADABLE_ERROR =
   'The document could not be read reliably. Try a clearer scan or enter the details manually.'
 
-/**
- * JSON-mode call shared by extraction and the rejection classifier.
- * The caller supplies the responseSchema and validates the text.
- */
+/** JSON-mode call. The caller supplies the response schema and validates the text. */
 export async function requestGeminiJson(
   apiKey: string,
   prompt: string,
@@ -92,11 +82,8 @@ export async function requestGeminiJson(
   return text
 }
 
-/**
- * Prose call for the help clerk. Same proxy and key routing as JSON mode;
- * no response schema, because the clerk explains the desk and never returns
- * a figure the rules engine would have to trust.
- */
+/** Prose call for the help clerk. Same key routing as JSON mode, with no schema,
+ * because the clerk must never return a figure the rules engine would trust. */
 export async function requestGeminiText(
   apiKey: string,
   body: {

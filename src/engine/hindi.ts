@@ -2,11 +2,8 @@ import type { CaseFile } from './types'
 import type { RejectionVerdict, Verdict } from './rules'
 import { formatINR } from './format'
 
-/**
- * Hindi (Devanagari) verdict summary — template-driven so the wording is
- * fixed and only the figures change. Font stack renders via
- * Noto Sans Devanagari / Tiro Devanagari Hindi.
- */
+/** Hindi verdict. The wording is fixed and only the figures change.
+ * Rendered with Noto Sans Devanagari / Tiro Devanagari Hindi. */
 export function hindiSummary(c: CaseFile, v: Verdict): string[] {
   const lines: string[] = []
 
@@ -51,11 +48,8 @@ export function hindiSummary(c: CaseFile, v: Verdict): string[] {
   return lines
 }
 
-/**
- * Hindi (Devanagari) summary of a rejection analysis — what the insurer said,
- * whether the desk agrees, and the next step. Same template discipline as
- * hindiSummary: wording is fixed, only the figures and grounds change.
- */
+/** Hindi rejection summary: what the insurer said, whether the desk agrees, and the next step.
+ * Wording is fixed; only the figures and grounds change. */
 export function hindiRejectionSummary(c: CaseFile, rej: RejectionVerdict): string[] {
   const lines: string[] = []
 

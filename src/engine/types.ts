@@ -16,12 +16,8 @@ export interface SubLimit {
   value: number
 }
 
-/**
- * A permanent exclusion clause. `label` is the schedule wording (displayed);
- * `match` holds lay/clinical keyword variants (e.g. "rhinoplasty" for a
- * cosmetic-surgery exclusion) so matching works on real diagnoses, not just
- * on the clause quoted verbatim.
- */
+/** Permanent exclusion. `label` is the schedule wording shown on the desk.
+ * `match` holds lay and clinical keywords so a diagnosis hits without quoting the clause. */
 export interface PolicyExclusion {
   label: string
   match: string[]
