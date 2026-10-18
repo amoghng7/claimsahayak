@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { TRUNCATION_NOTE, fileToDocTextSmart, ocrFile } from '../ocr'
+import { TRUNCATION_NOTE, fileToDocTextSmart, filesToDocTextsSmart, ocrFile } from '../ocr'
 
 function makeFile(name: string, type: string, content: string): File {
   return new File([content], name, { type })
@@ -31,6 +31,54 @@ describe('ocrFile', () => {
     await expect(
       ocrFile(makeFile('bill.pdf', 'application/pdf', 'x'), fetchImpl as typeof fetch),
     ).rejects.toThrow(/unavailable/)
+  })
+})
+
+describe('filesToDocTextsSmart', () => {
+  const deps = {
+    extractPdfText: async () => 'SELECTABLE TEXT LAYER with plenty of content here',
+    ocr: async (file: File) => `OCR TEXT from ${file.name}`,
+  }
+
+  it('keeps the readable files when one file fails — the batch is not aborted', async () => {
+    const files = [
+      makeFile('policy.pdf', 'application/pdf', 'bytes'),
+      makeFile('photo.jpg', 'image/jpeg', 'jpeg-bytes'),
+      makeFile('bill.pdf', 'application/pdf', 'bytes'),
+    ]
+    const { docs, failures } = await filesToDocTextsSmart(files, {
+      ...deps,
+      ocr: async (file) => {
+        if (file.name === 'photo.jpg') throw new Error('OCR failed (HTTP 404)')
+        return deps.ocr(file)
+      },
+    })
+    expect(docs.map((d) => d.label)).toEqual(['policy.pdf', 'bill.pdf'])
+    expect(failures).toEqual([{ label: 'photo.jpg', message: 'OCR failed (HTTP 404)' }])
+  })
+
+  it('records every file as failed when nothing could be read', async () => {
+    const files = [makeFile('a.jpg', 'image/jpeg', 'x'), makeFile('b.png', 'image/png', 'y')]
+    const { docs, failures } = await filesToDocTextsSmart(files, {
+      ...deps,
+      ocr: async () => {
+        throw new Error('OCR service unavailable')
+      },
+    })
+    expect(docs).toEqual([])
+    expect(failures.map((f) => f.label)).toEqual(['a.jpg', 'b.png'])
+  })
+
+  it('propagates a non-Error rejection as a failure message, not a crash', async () => {
+    const { docs, failures } = await filesToDocTextsSmart([makeFile('scan.jpg', 'image/jpeg', 'x')], {
+      ...deps,
+      ocr: async () => {
+        throw 'string failure'
+      },
+    })
+    expect(docs).toEqual([])
+    expect(failures).toHaveLength(1)
+    expect(failures[0].message).toBe('string failure')
   })
 })
 

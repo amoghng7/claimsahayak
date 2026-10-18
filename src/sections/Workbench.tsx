@@ -13,7 +13,7 @@ import { analyzeRejectionWithFallback, parseRejectionDate } from '../engine/reje
 import { buildEscalationLadder, buildGrievanceLetter, type EscalationStep } from '../engine/grievance'
 import { hindiRejectionSummary, hindiSummary } from '../engine/hindi'
 import { formatINR, formatDate } from '../engine/format'
-import { fileToDocTextSmart, MIN_TEXT_LAYER, ocrFile } from '../engine/ocr'
+import { filesToDocTextsSmart, MIN_TEXT_LAYER, ocrFile } from '../engine/ocr'
 import { pdfToText } from '../engine/pdf'
 import { caseStore, type StoredCaseMeta } from '../engine/store'
 import { extractCaseWithGemini, loadGeminiKey, storedPersonalKey } from '../engine/gemini'
@@ -955,38 +955,43 @@ export function Workbench({
       setTab('upload')
     }
     try {
-      const docs = []
-      for (const f of chosen) {
-        const d = await fileToDocTextSmart(f, {
-          extractPdfText: pdfToText,
-          ocr: async (file) => {
-            setBusyNote('image-based document, verifying quality…')
-            return ocrFile(file)
-          },
-        })
-        docs.push(d)
-        setBusyNote(null)
-        if (caseStore.loadConsent()) {
-          // Best-effort archive of the raw document (30-day lifecycle bucket);
-          // analysis must never block on the store.
-          caseStore.uploadDocument(f).catch(() => {})
-        }
+      const { docs, failures } = await filesToDocTextsSmart(chosen, {
+        extractPdfText: pdfToText,
+        ocr: async (file) => {
+          setBusyNote('image-based document, verifying quality…')
+          return ocrFile(file)
+        },
+      })
+      setBusyNote(null)
+      if (caseStore.loadConsent()) {
+        // Best-effort archive of the raw document (30-day lifecycle bucket);
+        // analysis must never block on the store.
+        for (const f of chosen) caseStore.uploadDocument(f).catch(() => {})
       }
-      const empty = docs.filter((d) => d.text.trim().length < MIN_TEXT_LAYER)
-      if (empty.length === docs.length) {
-        setUploadNote('Could not read those files, even with OCR. Try a sharper photo or a text export.')
+      // A file that "read" but yielded only noise counts as skipped, same as a failure.
+      const substantive = docs.filter((d) => d.text.trim().length >= MIN_TEXT_LAYER)
+      const skipped = [...failures.map((f) => f.label), ...docs.filter((d) => d.text.trim().length < MIN_TEXT_LAYER).map((d) => d.label)]
+      if (substantive.length === 0) {
+        setUploadNote(
+          skipped.length
+            ? `Could not read ${skipped.join(', ')}. Try a sharper photo or a text export.`
+            : 'Could not read those files, even with OCR. Try a sharper photo or a text export.',
+        )
         finishFailed()
         return
       }
-      const extracted = await extractCaseWithGemini(key, docs)
+      const extracted = await extractCaseWithGemini(key, substantive)
       pick(extracted, 'upload')
       if (caseStore.loadConsent()) {
         // Upsert sessions/{sessionId}/cases/{caseId}. The sidecar stamps savedAt and expireAt.
         caseStore.saveCase(extracted.id, extracted.claimant, JSON.stringify(extracted)).catch(() => {})
       }
-      const ocrCount = docs.filter((d) => d.ocr).length
+      const ocrCount = substantive.filter((d) => d.ocr).length
       setUploadNote(
-        `Read ${docs.length} document${docs.length > 1 ? 's' : ''}${ocrCount ? ` (${ocrCount} via OCR)` : ''}. Score rebuilt from your file.`,
+        `Read ${substantive.length} of ${chosen.length} document${chosen.length > 1 ? 's' : ''}` +
+          `${ocrCount ? ` (${ocrCount} via OCR)` : ''}` +
+          `${skipped.length ? `, skipped ${skipped.length} unreadable (${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? ', …' : ''})` : ''}` +
+          '. Score rebuilt from your file.',
       )
     } catch (err) {
       setUploadNote(err instanceof Error ? err.message : 'Extraction failed. The sample files still work.')

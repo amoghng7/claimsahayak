@@ -71,3 +71,27 @@ export async function fileToDocTextSmart(file: File, deps: SmartDeps = defaultDe
   }
   return { label: file.name, text: capText(text), ocr }
 }
+
+export interface DocFailure {
+  label: string
+  message: string
+}
+
+/** Batch read with per-file fault isolation: one unreadable scan must not
+ * discard the rest of the batch. Failures are reported by name so the caller
+ * can say which file was skipped. */
+export async function filesToDocTextsSmart(
+  files: File[],
+  deps: SmartDeps = defaultDeps,
+): Promise<{ docs: DocTextSmart[]; failures: DocFailure[] }> {
+  const docs: DocTextSmart[] = []
+  const failures: DocFailure[] = []
+  for (const file of files) {
+    try {
+      docs.push(await fileToDocTextSmart(file, deps))
+    } catch (err) {
+      failures.push({ label: file.name, message: err instanceof Error ? err.message : String(err) })
+    }
+  }
+  return { docs, failures }
+}
