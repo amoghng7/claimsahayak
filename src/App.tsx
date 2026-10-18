@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Landing } from './sections/Landing'
 import { Workbench } from './sections/Workbench'
-import { Login } from './sections/Login'
-import { useAuth } from './contexts/AuthContext'
-import { signOut } from './engine/auth'
 import { caseStore } from './engine/store'
 import {
   isDevKeyMissing,
@@ -157,7 +154,6 @@ export default function App() {
   const [initialCase, setInitialCase] = useState<string | undefined>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [keyState, refreshKeyState] = useKeyState()
-  const { user, loading } = useAuth()
   const keyLabel =
     keyState === 'personal' ? 'Your key' : keyState === 'managed' ? 'Managed key' : 'No key'
 
@@ -165,17 +161,6 @@ export default function App() {
     setInitialCase(caseId)
     setView('desk')
     window.scrollTo({ top: 0 })
-  }
-
-  // Gate: unauthenticated users see the login page instead of the desk
-  const effectiveView = view === 'desk' && !user ? 'login' : view
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-paper">
-        <span className="font-mono text-sm text-ink-3">Loading…</span>
-      </div>
-    )
   }
 
   return (
@@ -192,32 +177,6 @@ export default function App() {
               </span>
             </button>
             <nav aria-label="Primary" className="flex items-center gap-2.5">
-              {user && (
-                <div className="flex items-center gap-2">
-                  {user.photoURL && (
-                    <img
-                      src={user.photoURL}
-                      alt=""
-                      className="h-7 w-7 rounded-full"
-                      referrerPolicy="no-referrer"
-                    />
-                  )}
-                  <span className="hidden font-mono text-[11px] text-ink-3 sm:inline">
-                    {user.displayName || user.email}
-                  </span>
-                  <button
-                    onClick={() => {
-                      // Leave the desk before auth state flips: the gate would
-                      // otherwise dump the user onto the login form mid-session.
-                      setView('landing')
-                      void signOut().catch((e: unknown) => console.error('sign-out failed', e))
-                    }}
-                    className="min-h-11 font-mono text-[11px] text-ink-3 underline underline-offset-4 hover:text-ink"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              )}
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="flex min-h-11 items-center gap-2 rounded-full border border-ink/40 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-150 hover:bg-paper-2"
@@ -228,7 +187,7 @@ export default function App() {
                 />
                 {keyLabel}
               </button>
-              {effectiveView === 'landing' ? (
+              {view === 'landing' ? (
                 <button
                   onClick={() => openDesk()}
                   className="inline-flex min-h-11 items-center rounded-full bg-chart px-5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition-transform duration-150 hover:-translate-y-0.5"
@@ -247,9 +206,7 @@ export default function App() {
           </div>
         </header>
 
-        {effectiveView === 'login' ? (
-          <Login />
-        ) : effectiveView === 'landing' ? (
+        {view === 'landing' ? (
           <Landing onOpen={() => openDesk()} onSample={(id) => openDesk(id)} />
         ) : (
           <Workbench key={initialCase ?? 'default'} initialCaseId={initialCase} />

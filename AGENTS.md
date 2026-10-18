@@ -41,10 +41,6 @@ with the Cloud Run service account (ADC) — no API key material anywhere.
 - Gemini (`gemini-3.8-flash`, JSON mode) via `fetch` — no SDK. In deployment the call
   goes same-origin to the sidecar → **Vertex AI** (`global` endpoint — 3.8-flash is not
   published in `asia-south1`); the BYOK override calls the Developer API browser-direct.
-- Firebase Auth (`firebase/auth`, Google OAuth + email/password, client-side only; config in
-  `src/engine/auth.ts` is non-secret project metadata. Provisioned on `claim-sahayak` per
-  `infra/07-firebase-auth.sh`; Email/Password + Google providers enabled; authorized domains
-  include localhost and the Cloud Run URL)
 - Sidecar (`server/`): Node 20 ESM, `google-auth-library` only, `node --test` specs in
   `server/index.test.js`; started by `docker-entrypoint.d/40-sidecar.sh` inside the
   nginx container, bound to 127.0.0.1:8081.
@@ -79,15 +75,10 @@ Notes:
 
 ```
 src/
-  main.tsx            entry: StrictMode + BrowserRouter + AuthProvider
-  App.tsx             header (user/sign-out), settings sheet, landing/login/desk view switch
+  main.tsx            entry: StrictMode + BrowserRouter
+  App.tsx             header, settings sheet, landing/desk view switch
   index.css           Tailwind layers + design tokens (CSS custom properties)
-  contexts/
-    AuthContext.tsx   React context provider and useAuth hook
   engine/             all business logic — framework-free, importable anywhere
-    auth.ts           Firebase Auth: Google OAuth, email/password, auth state listener
-    authErrors.ts     mapAuthError — user-friendly messages, dependency-free (no SDK import);
-                      raw SDK errors never reach the UI
     types.ts          domain model: Policy, HospitalEpisode, BillLine, CaseFile
     rules.ts          deterministic engine: document checklist, room-rent math,
                       waiting periods, payable waterfall, score, rejection classifier
@@ -105,7 +96,7 @@ src/
     __tests__/        vitest specs for rules, rejection, grievance, hindi, gemini,
                       ocr, store
   data/samples.ts     three synthetic case files (all people/insurers fictional)
-  sections/           Landing.tsx, Login.tsx, Workbench.tsx (three-column desk UI)
+  sections/           Landing.tsx, Workbench.tsx (three-column desk UI)
   components/         kit.tsx (Kicker, NumberedSection, PanelTitle), ScoreStamp.tsx
 server/
   index.js            sidecar routes: POST /generate → Vertex AI (ADC),
@@ -115,7 +106,7 @@ server/
   index.test.js       node --test specs (handler is dependency-injected: token + fetch)
 start.sh              container entry: sidecar with restart loop + health wait,
                       then the official nginx entrypoint (envsubst) as PID 1
-infra/                gcloud scripts per phase (06-1-vertex.sh, …, 07-firebase-auth.sh)
+infra/                gcloud scripts per phase (06-1-vertex.sh, …, 06-4-persistence.sh)
 ```
 
 Module conventions:
