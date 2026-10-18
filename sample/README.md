@@ -33,9 +33,40 @@ Use these as golden fixtures: extract each folder, compare the verdict against
 - Exclusion keyword match on the procedure wording (N3).
 - Rejection-letter pipeline: repudiation text → regex classification → escalation ladder dates (N3).
 
+## Generated files
+
+Each scenario folder contains the **generated binary files** (what the app actually
+ingests), committed to the repo. The Markdown authoring sources are not committed;
+`sample/generate-files.mjs` (kept for reference) produced the binaries from them with
+`pdfkit` text-layer PDFs and `@napi-rs/canvas` simulated scans
+(`npm run generate-samples` — regenerating requires restoring the sources).
+
+### Format mapping
+
+The same rule is applied across every scenario folder. Document type drives the format
+— not the file number — so N1/N2's non-standard numbering is handled correctly.
+
+| Document type | Format | Pipeline exercised |
+|---|---|---|
+| Policy schedule | PDF (text-layer) | `pdf.ts` → pdfjs |
+| Claim form (Part A + B) | PDF (text-layer) | `pdf.ts` → pdfjs |
+| Discharge summary | JPEG (simulated phone-photo) | `ocr.ts` → Document AI |
+| Itemised final bill | PDF (text-layer, multi-page) | `pdf.ts` → pdfjs |
+| Investigation / lab reports | PNG (simulated flatbed scan) | `ocr.ts` → Document AI |
+| Prescriptions | JPEG (simulated photo) | `ocr.ts` → Document AI |
+| Pharmacy bills | JPEG (simulated photo) | `ocr.ts` → Document AI |
+| KYC / PAN / Aadhaar | JPEG (simulated photo) | `ocr.ts` → Document AI |
+| NEFT mandate / cancelled cheque | PDF (text-layer) | `pdf.ts` → pdfjs |
+| FIR / MLC (P2 only) | PDF (text-layer) | `pdf.ts` → pdfjs |
+| Implant sticker / invoice (P2 only) | JPEG (simulated photo) | `ocr.ts` → Document AI |
+| Repudiation letter (N3 only) | PDF (text-layer) | `pdf.ts` → pdfjs |
+
+JPEG/PNG files include mild grain noise, slight rotation (< 0.5°), and corner vignetting
+to realistically simulate handheld camera capture. `SCENARIO.md` is never converted.
+
 ## Usage
 
 The app ingests PDFs (text-layer via pdf.js, scans via Document AI). To test with these
-fixtures, convert each Markdown file to PDF (any print-to-PDF works), or paste the text
-into the extractor. Keep one scenario per case. `SCENARIO.md` is ground truth for the
-verdict — never upload it as a claim document.
+fixtures, upload one scenario folder's PDFs and photos through the desk's file picker.
+Keep one scenario per case. `SCENARIO.md` is ground truth for the verdict — never
+upload it as a claim document.
