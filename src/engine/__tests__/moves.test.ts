@@ -41,4 +41,12 @@ describe('claimMoves', () => {
     expect(moves[0].title).toMatch(/non-disclosure/i)
     expect(moves[1].impact).toBe('know')
   })
+
+  it('unread policy: attaching the schedule is the first move, never "File it"', () => {
+    const unread: CaseFile = { ...meera, policy: { ...meera.policy, inceptionDate: null } }
+    const moves = claimMoves(unread, buildVerdict(unread))
+    expect(moves[0].id).toBe('policy-schedule')
+    expect(moves[0].impact).toBe('raise')
+    expect(moves.map((m) => m.id)).not.toContain('ready')
+  })
 })

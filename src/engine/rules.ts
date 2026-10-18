@@ -33,10 +33,27 @@ export function missingDocs(c: CaseFile): DocSpec[] {
 
 /* Room-rent sub-limit and proportional deduction */
 
+/** The verified policy inception date, or null when no schedule was read.
+ * The inception date is the anchor of every waiting-period clock; null
+ * (extraction saw no schedule) or an epoch sentinel (the model's fallback)
+ * both mean the terms are unverified — old saved cases carry the literal
+ * epoch string, so the sentinel check has to live here, not only in the
+ * extraction layer. */
+export function verifiedInception(policy: Policy): string | null {
+  if (policy.inceptionDate === null) return null
+  const t = new Date(policy.inceptionDate).getTime()
+  return Number.isFinite(t) && t > 0 ? policy.inceptionDate : null
+}
+
+export function isPolicyScheduleKnown(policy: Policy): boolean {
+  return verifiedInception(policy) !== null
+}
+
 /** ₹/day the policy allows, or null when there is no effective cap. */
 export function allowedRoomRent(policy: Policy): number | null {
   const r = policy.roomRent
-  if (r.type === 'percent_si' && r.value) return (policy.sumInsured * r.value) / 100
+  // A percentage of an unread (zero) sum insured is no verified cap — not ₹0.
+  if (r.type === 'percent_si' && r.value) return policy.sumInsured > 0 ? (policy.sumInsured * r.value) / 100 : null
   if (r.type === 'daily_cap' && r.value) return r.value
   return null // no_limit / single_room → eligibility rule, not an amount cap
 }
@@ -160,9 +177,25 @@ export interface PedWaitingResult {
 
 export function pedWaitingCheck(policy: Policy, ep: HospitalEpisode): PedWaitingResult {
   const extractedWait = policy.pedWaitMonths ?? PED_WAIT_CAP_MONTHS
+  const inception = verifiedInception(policy)
+  // No schedule → no PED clock can run; report a clean, well-formed result
+  // rather than letting the date maths certify an unread policy.
+  if (inception === null) {
+    return {
+      matchedPed: null,
+      monthsSinceStart: 0,
+      waitMonths: Math.min(extractedWait, PED_WAIT_CAP_MONTHS),
+      nonCompliant: extractedWait > PED_WAIT_CAP_MONTHS,
+      breach: false,
+      nearingCompletion: false,
+      completesOn: null,
+      excludedLines: [],
+      excludedAmount: 0,
+    }
+  }
   const nonCompliant = extractedWait > PED_WAIT_CAP_MONTHS
   const waitMonths = Math.min(extractedWait, PED_WAIT_CAP_MONTHS)
-  const monthsSinceStart = monthsBetween(policy.inceptionDate, ep.admissionDate)
+  const monthsSinceStart = monthsBetween(inception, ep.admissionDate)
 
   const treatmentText = `${ep.diagnosis} ${ep.procedure}`
   let matchedPed: string | null = null
@@ -180,7 +213,7 @@ export function pedWaitingCheck(policy: Policy, ep: HospitalEpisode): PedWaiting
   // A breach in the wait's last 3 months is a timing problem, not a dead
   // claim — render it as the amber "completes on" note instead of crimson.
   const nearingCompletion = breach && waitMonths - monthsSinceStart <= 3
-  const completesOn = matchedPed !== null ? addMonths(policy.inceptionDate, waitMonths) : null
+  const completesOn = matchedPed !== null ? addMonths(inception, waitMonths) : null
   const excludedLines = breach
     ? ep.billLines.filter((l) => matchedVariants.some((v) => containsKeyword(l.head, v)))
     : []
@@ -206,11 +239,15 @@ export interface WaitingFlag {
 }
 
 export function waitingPeriodCheck(c: CaseFile): WaitingFlag[] {
+  // A breach cannot be established without the schedule — never certify the
+  // waits as either breached or served on an unread policy.
+  const inception = verifiedInception(c.policy)
+  if (inception === null) return []
   const flags: WaitingFlag[] = []
   const p = c.policy
   const ep = c.episode
-  const daysSinceInception = daysBetween(p.inceptionDate, ep.admissionDate)
-  const yearsSinceInception = yearsBetween(p.inceptionDate, ep.admissionDate)
+  const daysSinceInception = daysBetween(inception, ep.admissionDate)
+  const yearsSinceInception = yearsBetween(inception, ep.admissionDate)
 
   if (!ep.accidentRelated && daysSinceInception < p.initialWaitingDays) {
     flags.push({
@@ -268,6 +305,8 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
   // Named sub-limits cap the (post-proportional) sum of their matched lines.
   const subLimitCuts: SubLimitCut[] = []
   for (const sl of c.policy.subLimits) {
+    // % of sum insured is no cap at all when the sum insured was never read.
+    if (sl.type === 'percent_si' && c.policy.sumInsured <= 0) continue
     const limit =
       sl.type === 'fixed'
         ? sl.value
@@ -304,10 +343,22 @@ export function estimatePayable(c: CaseFile): PayableEstimate {
 
 /* Claim-readiness score */
 
+/** The waiting (−30) and room (−15) checks cannot run without the schedule;
+ * unverified is not neutral, and a readiness score may not read as "checked". */
+export const UNKNOWN_POLICY_PENALTY = 10
+
 export type Band = 'strong' | 'fair' | 'weak'
 
 export interface DeductionFlag {
-  kind: 'room_rent' | 'proportional' | 'copay' | 'non_payable' | 'waiting' | 'exclusion' | 'ped'
+  kind:
+    | 'room_rent'
+    | 'proportional'
+    | 'copay'
+    | 'non_payable'
+    | 'waiting'
+    | 'exclusion'
+    | 'ped'
+    | 'policy_unverified'
   severity: 'high' | 'medium'
   title: string
   detail: string
@@ -340,6 +391,7 @@ export function buildVerdict(c: CaseFile): Verdict {
   const exclusions = exclusionCheck(c.policy, c.episode)
   const ped = pedWaitingCheck(c.policy, c.episode)
   const rr = roomRentAnalysis(c.policy, c.episode)
+  const policyKnown = isPolicyScheduleKnown(c.policy)
   const flags: DeductionFlag[] = []
   const reasons: Reason[] = []
 
@@ -374,8 +426,10 @@ export function buildVerdict(c: CaseFile): Verdict {
       clause: 'Policy T&C, "Proportionate Deduction": associated medical expenses are payable in the same proportion as the admissible room rent bears to the actual room rent.',
     })
     reasons.push({ ok: false, label: `Room-rent trap: ${Math.round((1 - rr.ratio) * 100)}% proportional cut exposure` })
-  } else {
+  } else if (policyKnown) {
     reasons.push({ ok: true, label: 'Room category within sub-limit' })
+  } else {
+    reasons.push({ ok: false, label: 'Room-rent cap unverified — no policy schedule on file' })
   }
 
   if (exclusions.hits.length > 0) {
@@ -436,8 +490,24 @@ export function buildVerdict(c: CaseFile): Verdict {
       })
     }
     reasons.push({ ok: false, label: `Waiting-period breach: ${waiting[0].label.toLowerCase()}` })
-  } else {
+  } else if (policyKnown) {
     reasons.push({ ok: true, label: 'All waiting periods served' })
+  } else {
+    reasons.push({ ok: false, label: 'No policy schedule read — waiting periods and sub-limits are unverified' })
+  }
+
+  if (!policyKnown) {
+    score -= UNKNOWN_POLICY_PENALTY
+    flags.push({
+      kind: 'policy_unverified',
+      severity: 'medium',
+      title: 'No policy schedule on file',
+      detail:
+        'The policy schedule was not among the documents read. Waiting periods, PED waits, room-rent caps and sub-limits could not be checked — they are treated as unverified, not as satisfied.',
+      amountAtRisk: 0,
+      clause:
+        'IRDAI (PPHI) Regulations 2024: waiting periods, sub-limits and room-rent caps are evidenced only by the policy schedule.',
+    })
   }
 
   if (c.policy.copayPct > 0) {
@@ -466,7 +536,9 @@ export function buildVerdict(c: CaseFile): Verdict {
   }
 
   score = Math.max(0, Math.min(100, Math.round(score)))
-  const band: Band = score >= 75 ? 'strong' : score >= 50 ? 'fair' : 'weak'
+  let band: Band = score >= 75 ? 'strong' : score >= 50 ? 'fair' : 'weak'
+  // "Claim-ready" is structurally impossible without a verified schedule.
+  if (!policyKnown && band === 'strong') band = 'fair'
   return { score, band, reasons, missing, flags, payable, roomRent: rr, waiting, exclusions, ped }
 }
 
@@ -498,7 +570,26 @@ const PATTERNS: Pattern[] = [
     match: /pre[- ]?existing|non[- ]?disclosure|not disclosed|misrepresentation|ped/i,
     reason: 'Pre-existing disease / non-disclosure',
     assess: (c) => {
-      const years = yearsBetween(c.policy.inceptionDate, c.episode.admissionDate)
+      // The moratorium clock is continuous-coverage evidence; without the
+      // schedule it cannot be verified either way.
+      const inception = verifiedInception(c.policy)
+      if (inception === null) {
+        return {
+          reversible: 'partial',
+          explanation:
+            'The policy schedule is not on the file, so the 5-year moratorium clock cannot be verified yet. Attach the schedule and every renewal receipt to establish continuous coverage before replying.',
+          steps: [
+            'Attach the policy schedule and the full renewal chain (inception to date) to establish continuous coverage.',
+            'Obtain a treating-doctor certificate that the hospitalised condition is unrelated to the alleged undisclosed ailment.',
+            'Check proposal-form answers. If the question was ambiguous, note it. Ambiguity reads against the insurer.',
+          ],
+          clauses: [
+            "IRDAI (Protection of Policyholders' Interests) Regulations, 2024: moratorium of 5 continuous years; no repudiation thereafter except proven fraud.",
+            'IRDAI HPR 2024: PED waiting period capped at 36 months.',
+          ],
+        }
+      }
+      const years = yearsBetween(inception, c.episode.admissionDate)
       if (years >= 5) {
         return {
           reversible: 'yes',

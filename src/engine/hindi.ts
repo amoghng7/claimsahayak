@@ -1,5 +1,6 @@
 import type { CaseFile } from './types'
 import type { RejectionVerdict, Verdict } from './rules'
+import { isPolicyScheduleKnown } from './rules'
 import { formatINR } from './format'
 
 /** Hindi verdict. The wording is fixed and only the figures change.
@@ -37,6 +38,10 @@ export function hindiSummary(c: CaseFile, v: Verdict): string[] {
 
   if (v.waiting.length > 0) {
     lines.push(`प्रतीक्षा अवधि: ${v.waiting[0].label} पूरी नहीं हुई थी। इस आधार पर दावा खारिज होने की संभावना है।`)
+  } else if (!isPolicyScheduleKnown(c.policy)) {
+    lines.push(
+      'पॉलिसी शेड्यूल नहीं मिली — प्रतीक्षा अवधि, PED और सब-लीमिट की जाँच नहीं हो सकी। पहले पॉलिसी की कॉपी जोड़ें।',
+    )
   }
 
   lines.push(

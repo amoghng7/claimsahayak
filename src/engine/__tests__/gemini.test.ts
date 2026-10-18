@@ -133,6 +133,47 @@ describe('extractCaseWithGemini — schema validation', () => {
   })
 })
 
+describe('extractCaseWithGemini — inceptionDate nullability', () => {
+  function withInception(iso: string | null) {
+    const payload = structuredClone(VALID_PAYLOAD)
+    return { ...payload, policy: { ...payload.policy, inceptionDate: iso } }
+  }
+
+  it('keeps a real inception date unchanged', async () => {
+    mockFetchSequence(geminiResponse(VALID_PAYLOAD))
+    const c = await extractCaseWithGemini('test-key', DOCS)
+    expect(c.policy.inceptionDate).toBe('2021-01-01')
+  })
+
+  it('accepts null when no policy schedule was visible', async () => {
+    mockFetchSequence(geminiResponse(withInception(null)))
+    const c = await extractCaseWithGemini('test-key', DOCS)
+    expect(c.policy.inceptionDate).toBeNull()
+  })
+
+  it('scrubs an epoch sentinel (1970-01-01) to null', async () => {
+    mockFetchSequence(geminiResponse(withInception('1970-01-01')))
+    const c = await extractCaseWithGemini('test-key', DOCS)
+    expect(c.policy.inceptionDate).toBeNull()
+  })
+
+  it('scrubs an empty-string inceptionDate to null', async () => {
+    mockFetchSequence(geminiResponse(withInception('')))
+    const c = await extractCaseWithGemini('test-key', DOCS)
+    expect(c.policy.inceptionDate).toBeNull()
+  })
+
+  it('rejects a non-string, non-null inceptionDate via the schema', async () => {
+    const bad = withInception('2021-01-01')
+    // @ts-expect-error — deliberately malformed
+    bad.policy.inceptionDate = 42
+    mockFetchSequence(geminiResponse(bad), geminiResponse(bad))
+    await expect(extractCaseWithGemini('test-key', DOCS)).rejects.toThrow(
+      'The document could not be read reliably',
+    )
+  })
+})
+
 function errorResponse(status: number) {
   return { ok: false, status, text: async () => '' } as Response
 }

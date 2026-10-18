@@ -24,7 +24,7 @@ export const policySchema = z.object({
   insurer: z.string(),
   product: z.string(),
   policyNo: z.string(),
-  inceptionDate: z.string(),
+  inceptionDate: z.string().nullable(),
   sumInsured: z.number().nonnegative(),
   roomRent: roomRentSchema,
   copayPct: z.number().nonnegative(),
@@ -113,7 +113,7 @@ export const EXTRACTION_RESPONSE_SCHEMA = {
         insurer: { type: 'STRING' },
         product: { type: 'STRING' },
         policyNo: { type: 'STRING' },
-        inceptionDate: { type: 'STRING' },
+        inceptionDate: { type: 'STRING', nullable: true },
         sumInsured: { type: 'NUMBER' },
         roomRent: {
           type: 'OBJECT',

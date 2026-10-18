@@ -34,6 +34,16 @@ describe('hindiSummary', () => {
     )
     expect(bands).toEqual(new Set(['strong', 'fair', 'weak']))
   })
+
+  it('unread policy: says the schedule is missing, makes no waiting-period claim', () => {
+    const unread: CaseFile = { ...SAMPLE_CASES[1], policy: { ...SAMPLE_CASES[1].policy, inceptionDate: null } }
+    const v = buildVerdict(unread)
+    const text = hindiSummary(unread, v).join('\n')
+    expect(text).toContain('पॉलिसी शेड्यूल नहीं मिली')
+    expect(text).toContain('पॉलिसी की कॉपी जोड़ें')
+    // no claim that a waiting period was breached or served
+    expect(text).not.toContain('पूरी नहीं हुई')
+  })
 })
 
 describe('hindiRejectionSummary', () => {

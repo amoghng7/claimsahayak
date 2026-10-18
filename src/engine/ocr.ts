@@ -5,6 +5,16 @@ import { pdfToText } from './pdf'
 
 export const MIN_TEXT_LAYER = 40 // below this the text layer is noise, not content
 const DOC_TEXT_CAP = 30_000
+// Keep in sync with OCR_TEXT_CAP + its marker in server/index.js: while both
+// caps stay 30,000 the client slice strips the server's marker whole and
+// appends its own, so the model sees exactly one truncation note.
+export const TRUNCATION_NOTE =
+  '\n\n[NOTE: document truncated at 30,000 characters — the remaining text was not analysed.]'
+
+/** Cap + a visible marker, so the model knows it did not see the whole document. */
+function capText(text: string): string {
+  return text.length > DOC_TEXT_CAP ? text.slice(0, DOC_TEXT_CAP) + TRUNCATION_NOTE : text
+}
 
 async function fileToBase64(file: File): Promise<string> {
   const buf = new Uint8Array(await file.arrayBuffer())
@@ -59,5 +69,5 @@ export async function fileToDocTextSmart(file: File, deps: SmartDeps = defaultDe
   } else {
     text = await file.text()
   }
-  return { label: file.name, text: text.slice(0, DOC_TEXT_CAP), ocr }
+  return { label: file.name, text: capText(text), ocr }
 }

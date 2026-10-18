@@ -27,7 +27,8 @@ export interface Policy {
   insurer: string
   product: string
   policyNo: string
-  inceptionDate: string // ISO
+  /** ISO; null when no policy schedule was read — every waiting-period clock hangs off it */
+  inceptionDate: string | null
   sumInsured: number
   roomRent: RoomRentLimit
   copayPct: number

@@ -206,7 +206,7 @@ function CaseRail({
           {[
             ['Insurer', current.policy.insurer],
             ['Product', current.policy.product],
-            ['Sum insured', formatINR(current.policy.sumInsured)],
+            ['Sum insured', current.policy.sumInsured > 0 ? formatINR(current.policy.sumInsured) : 'Not stated'],
             [
               'Room rent cap',
               current.policy.roomRent.type === 'percent_si'
@@ -216,8 +216,8 @@ function CaseRail({
                   : 'No cap stated',
             ],
             ['Co-pay', current.policy.copayPct > 0 ? `${current.policy.copayPct}%` : 'None'],
-            ['PED wait', `${current.policy.pedWaitMonths ?? 36} mo`],
-            ['Since', formatDate(current.policy.inceptionDate)],
+            ['PED wait', current.policy.pedWaitMonths != null ? `${current.policy.pedWaitMonths} mo` : 'Not stated'],
+            ['Since', current.policy.inceptionDate ? formatDate(current.policy.inceptionDate) : 'Not stated'],
           ].map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3 border-b border-dashed border-line-faint py-1.5">
               <dt className="shrink-0 text-ink-3">{k}</dt>

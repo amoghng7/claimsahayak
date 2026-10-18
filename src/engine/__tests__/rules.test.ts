@@ -6,9 +6,11 @@ import {
   buildVerdict,
   estimatePayable,
   exclusionCheck,
+  isPolicyScheduleKnown,
   missingDocs,
   pedWaitingCheck,
   roomRentAnalysis,
+  verifiedInception,
   waitingPeriodCheck,
 } from '../rules'
 import { SAMPLE_CASES } from '../../data/samples'
@@ -78,6 +80,10 @@ describe('allowedRoomRent', () => {
 
   it('single_room → null (eligibility rule, not an amount cap)', () => {
     expect(allowedRoomRent(makePolicy({ roomRent: { type: 'single_room' } }))).toBeNull()
+  })
+
+  it('percent_si on an unread (zero) sum insured → null — no verified cap, not ₹0', () => {
+    expect(allowedRoomRent(makePolicy({ sumInsured: 0, roomRent: { type: 'percent_si', value: 1 } }))).toBeNull()
   })
 })
 
@@ -158,6 +164,99 @@ describe('waitingPeriodCheck', () => {
     c.episode.admissionDate = '2026-01-10'
     c.episode.accidentRelated = true
     expect(waitingPeriodCheck(c)).toHaveLength(0)
+  })
+})
+
+describe('unread policy schedule — unknown is never certified as served', () => {
+  it('verifiedInception keeps a real date and rejects null and the epoch sentinel', () => {
+    expect(verifiedInception(makePolicy())).toBe('2021-01-01')
+    expect(verifiedInception(makePolicy({ inceptionDate: null }))).toBeNull()
+    // pre-fix saved cases carry the model's epoch fallback as a literal string
+    expect(verifiedInception(makePolicy({ inceptionDate: '1970-01-01' }))).toBeNull()
+    expect(isPolicyScheduleKnown(makePolicy({ inceptionDate: '1970-01-01' }))).toBe(false)
+  })
+
+  it('roomRentAnalysis: percent_si on a zero sum insured is no trap, not a 100% cut', () => {
+    const c = makeCase({ policy: makePolicy({ sumInsured: 0, roomRent: { type: 'percent_si', value: 1 } }) })
+    expect(roomRentAnalysis(c.policy, c.episode)).toBeNull()
+  })
+
+  it('waitingPeriodCheck: an unread policy raises no flag — a breach cannot be established', () => {
+    expect(waitingPeriodCheck(makeCase({ policy: makePolicy({ inceptionDate: null }) }))).toEqual([])
+    expect(waitingPeriodCheck(makeCase({ policy: makePolicy({ inceptionDate: '1970-01-01' }) }))).toEqual([])
+  })
+
+  it('pedWaitingCheck: unread policy with a declared matching PED → clean result, no breach', () => {
+    const c = makeCase({
+      policy: makePolicy({ inceptionDate: null, pedsDeclared: ['Diabetes mellitus (Type 2)'] }),
+    })
+    c.episode.diagnosis = 'Diabetic foot ulcer'
+    const ped = pedWaitingCheck(c.policy, c.episode)
+    expect(ped.breach).toBe(false)
+    expect(ped.matchedPed).toBeNull()
+    expect(ped.completesOn).toBeNull()
+    expect(ped.excludedAmount).toBe(0)
+  })
+
+  it('buildVerdict: unread policy — caveat reasons, −10, no "served" positives, band capped at fair', () => {
+    const v = buildVerdict(makeCase({ policy: makePolicy({ inceptionDate: null }) }))
+    const labels = v.reasons.map((r) => r.label)
+    expect(labels).toContain('No policy schedule read — waiting periods and sub-limits are unverified')
+    expect(labels).toContain('Room-rent cap unverified — no policy schedule on file')
+    expect(labels).not.toContain('All waiting periods served')
+    expect(labels).not.toContain('Room category within sub-limit')
+    expect(v.waiting).toEqual([])
+    expect(v.flags.filter((f) => f.kind === 'policy_unverified')).toHaveLength(1)
+    expect(v.flags.find((f) => f.kind === 'policy_unverified')?.severity).toBe('medium')
+    // 100 − 8 (optional-doc cap) − 10 (unread policy) = 82
+    expect(v.score).toBe(82)
+    // 82 ≥ 75 would be strong, but "Claim-ready" is impossible without a schedule
+    expect(v.band).toBe('fair')
+  })
+
+  it('buildVerdict: unread policy with mandatory gaps lands in the weak band', () => {
+    const c = makeCase({
+      policy: makePolicy({ inceptionDate: null }),
+      providedDocIds: ['claim-form', 'discharge-summary', 'final-bill'],
+    })
+    const v = buildVerdict(c)
+    // 100 − 36 (mandatory cap) − 8 (optional cap) − 10 = 46
+    expect(v.score).toBe(46)
+    expect(v.band).toBe('weak')
+  })
+
+  it('buildVerdict: an epoch inception (old saved-case shape) is treated as unread', () => {
+    const v = buildVerdict(makeCase({ policy: makePolicy({ inceptionDate: '1970-01-01' }) }))
+    expect(v.reasons.map((r) => r.label)).not.toContain('All waiting periods served')
+    expect(v.score).toBe(82)
+  })
+
+  it('buildVerdict: a known policy still gets the positive reasons', () => {
+    const v = buildVerdict(makeCase())
+    const labels = v.reasons.map((r) => r.label)
+    expect(labels).toContain('All waiting periods served')
+    expect(labels).toContain('Room category within sub-limit')
+    expect(v.flags.filter((f) => f.kind === 'policy_unverified')).toHaveLength(0)
+  })
+
+  it('analyzeRejection: PED non-disclosure over an unread policy → partial, no NaN years', () => {
+    const c = makeCase({ policy: makePolicy({ inceptionDate: null }) })
+    const rej = analyzeRejection(c, 'Your claim stands repudiated for non-disclosure of a pre-existing disease.')
+    expect(rej.patternId).toBe('ped-nondisclosure')
+    expect(rej.reversible).toBe('partial')
+    expect(rej.explanation).not.toContain('NaN')
+    expect(rej.explanation).toContain('moratorium clock cannot be verified')
+  })
+
+  it('estimatePayable: a percent_si sub-limit on a zero sum insured is skipped, not a 100% cut', () => {
+    const c = makeCase({
+      policy: makePolicy({
+        sumInsured: 0,
+        subLimits: [{ name: 'Cataract', match: ['cataract'], type: 'percent_si', value: 10 }],
+      }),
+    })
+    c.episode.billLines.push({ head: 'Cataract surgery', amount: 50000, roomLinked: false })
+    expect(estimatePayable(c).subLimitCuts).toEqual([])
   })
 })
 

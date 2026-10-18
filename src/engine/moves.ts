@@ -1,5 +1,6 @@
 import type { CaseFile } from './types'
 import type { RejectionVerdict, Verdict } from './rules'
+import { isPolicyScheduleKnown } from './rules'
 import { formatDate, formatINR } from './format'
 
 /** Next moves from the rules verdict only. The model never decides what would raise payment.
@@ -31,6 +32,18 @@ export function claimMoves(c: CaseFile, v: Verdict, rejection?: RejectionVerdict
           ? `Answer the rejection: ${rejection.reason}`
           : `Contest the rejection: ${rejection.reason}`,
       detail: rejection.steps[0] ?? rejection.explanation,
+    })
+  }
+
+  // Before anything else: without the schedule the score could not check
+  // waiting periods, PED waits or sub-limits, so that is the first fix.
+  if (!isPolicyScheduleKnown(c.policy)) {
+    moves.push({
+      id: 'policy-schedule',
+      impact: 'raise',
+      title: 'Attach the policy schedule copy',
+      detail:
+        'Waiting periods, PED waits, room-rent caps and sub-limits could not be verified without it. The score treats those checks as unverified, not as passed.',
     })
   }
 

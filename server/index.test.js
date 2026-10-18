@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { buildGenerateBody, createHandler, docaiUrl, vertexUrl } from './index.js'
+import { buildGenerateBody, createHandler, docaiUrl, OCR_TRUNCATION_NOTE, vertexUrl } from './index.js'
 
 const FAKE_BODY = JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
 
@@ -273,6 +273,34 @@ describe('POST /ocr', () => {
     assert.equal(calls[0].opts.headers.Authorization, 'Bearer token-ocr')
     const sent = JSON.parse(calls[0].opts.body)
     assert.deepEqual(sent, { rawDocument: { content: 'YmFzZTY0', mimeType: 'application/pdf' } })
+  })
+
+  it('caps Document AI text at 30,000 chars and appends a visible truncation marker', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 200, text: async () => JSON.stringify({ document: { text: 'x'.repeat(30_001) } }) }),
+    })
+    const res = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'eA==', mimeType: 'application/pdf' })), res)
+    assert.equal(res.statusCode, 200)
+    const { text } = JSON.parse(res.body)
+    assert.equal(text.length, 30_000 + OCR_TRUNCATION_NOTE.length)
+    assert.equal(text.split('[NOTE:').length - 1, 1)
+  })
+
+  it('returns short Document AI text unchanged with no marker', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 200, text: async () => JSON.stringify({ document: { text: 'short scan text' } }) }),
+    })
+    const res = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'eA==', mimeType: 'application/pdf' })), res)
+    assert.equal(res.statusCode, 200)
+    const { text } = JSON.parse(res.body)
+    assert.equal(text, 'short scan text')
+    assert.ok(!text.includes('[NOTE:'))
   })
 
   it('answers 400 JSON when content is missing', async () => {

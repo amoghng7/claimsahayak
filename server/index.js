@@ -27,6 +27,11 @@ const MAX_OCR_CHARS = 14_000_000
 const MAX_CASE_PAYLOAD = 400_000
 const MAX_CASE_NAME = 200
 const OCR_TEXT_CAP = 30_000
+// Keep in sync with DOC_TEXT_CAP + its marker in src/engine/ocr.ts: while both
+// caps stay 30,000 the client slice strips this marker whole and appends its
+// own, so the model sees exactly one truncation note.
+export const OCR_TRUNCATION_NOTE =
+  '\n\n[NOTE: document truncated at 30,000 characters — the remaining text was not analysed.]'
 // Firestore deletes the case once this timestamp is in the past.
 const CASE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const OCR_MIMES = new Set([
@@ -314,7 +319,9 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
           return upstreamError(res, upstream.status, 'The OCR service rejected the document.')
         }
         const data = JSON.parse(await upstream.text())
-        json(res, 200, { text: String(data?.document?.text ?? '').slice(0, OCR_TEXT_CAP) })
+        const ocrText = String(data?.document?.text ?? '')
+        const capped = ocrText.length > OCR_TEXT_CAP ? ocrText.slice(0, OCR_TEXT_CAP) + OCR_TRUNCATION_NOTE : ocrText
+        json(res, 200, { text: capped })
       } catch {
         json(res, 502, { error: 'upstream_unavailable', message: 'The OCR service is unavailable right now.' })
       }

@@ -16,7 +16,7 @@ room-rent arithmetic the family discovers too late."
 
 ## Beat 2 — The room-rent trap (0:20–1:00)
 
-**Visual:** open the readiness desk → case "Room-rent trap" (Ramesh Iyer).
+**Visual:** open the desk → case "Room-rent trap" (Ramesh Iyer).
 **Show, in order:**
 1. The room-rent flag: room at ₹8,000/day against a ₹5,000/day cap (1% of the ₹5 lakh
    sum insured) → ratio 0.625.
@@ -29,7 +29,7 @@ prices that trap before the claim is filed, not after the rejection."
 
 ## Beat 3 — The rejection desk (1:00–1:40)
 
-**Visual:** case "Rejected — PED ground" (Arvind Rao). The bundled rejection letter is
+**Visual:** case "Rejected, PED" (Arvind Rao). The bundled rejection letter is
 already in the desk.
 **Show, in order:**
 1. Classification: PED non-disclosure.
@@ -46,9 +46,9 @@ computed."
 ## Beat 4 — Responsible AI (1:40–2:10)
 
 **Visual:** split attention — `docs/architecture.md` diagram (engine boundary), then a
-terminal running `npm run test` → **103 passing**.
+terminal running `npm run test` → **153 passing**.
 **Line:** "Every rupee figure comes from a deterministic rules engine — a hundred and
-three unit tests. The AI only reads documents; it is never allowed to invent your
+fifty-three unit tests. The AI only reads documents; it is never allowed to invent your
 policy."
 
 ## Beat 5 — Reach (2:10–2:30)

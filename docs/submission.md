@@ -44,7 +44,7 @@ The system is deliberately built so the language model can never invent a number
 - **All money math is deterministic and unit-tested.** Score, room-rent ratio,
   proportional deduction, sub-limit caps, PED cuts, co-pay and the settlement
   waterfall are computed by a framework-free TypeScript rules engine
-  (`src/engine/rules.ts`) — 103 vitest assertions, including the three bundled case
+  (`src/engine/rules.ts`) — 153 vitest assertions, including the three bundled case
   files' documented scores and payouts (e.g. the room-rent-trap case: score 53,
   expected payout ₹3,49,750 on a ₹4,35,000 bill).
 - **Citations are verified, not hallucinated.** Every regulatory claim in the UI

@@ -17,7 +17,7 @@ From the document texts below, produce ONE JSON object with EXACTLY this shape
   "patientAge": number,
   "policy": {
     "insurer": string, "product": string, "policyNo": string,
-    "inceptionDate": "YYYY-MM-DD", "sumInsured": number,
+    "inceptionDate": "YYYY-MM-DD" | null, "sumInsured": number,
     "roomRent": { "type": "percent_si" | "daily_cap" | "no_limit" | "single_room", "value": number | null },
     "copayPct": number, "initialWaitingDays": number,
     "pedWaitMonths": number | null, "pedsDeclared": string[],
@@ -39,7 +39,8 @@ From the document texts below, produce ONE JSON object with EXACTLY this shape
 }
 
 Rules:
-- Use null or a sensible default when a field is absent; never invent policy terms you cannot see.
+- inceptionDate: null when no policy schedule is visible. Never invent a date for it.
+- Use null or an empty value when a field is absent; never invent policy terms you cannot see.
 - providedDocIds must use ids from: claim-form, discharge-summary, final-bill, investigations, prescriptions, pharmacy, policy-copy, kyc, neft, fir, implant.
 - roomLinked = true for heads that insurers tie to room category (surgeon/ consultant fees, nursing, OT charges); isRoomRent = true for the room & nursing rent line itself; nonPayable = true for consumables (gloves, masks, syringes, etc.).
 - exclusions = the policy schedule's permanent exclusions: label is the clause in short form (e.g. "Cosmetic or aesthetic surgery"), match holds lowercase keyword variants that a diagnosis or bill line would actually use (lay + clinical, e.g. ["cosmetic", "aesthetic", "rhinoplasty"]).
@@ -145,6 +146,15 @@ function candidateText(json: unknown): string | undefined {
   return text || undefined
 }
 
+/** Extraction may hand back an epoch sentinel when no schedule was visible
+ * (the model's fallback shape); anything at or before 1970-01-01T00:00:00Z
+ * means "no date was read", so it becomes null before the engine sees it. */
+function scrubInceptionDate(iso: string | null): string | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  return Number.isFinite(t) && t > 0 ? iso : null
+}
+
 function toCaseFile(data: z.infer<typeof extractionSchema>): CaseFile {
   return {
     id: `live-${Date.now()}`,
@@ -152,6 +162,7 @@ function toCaseFile(data: z.infer<typeof extractionSchema>): CaseFile {
     patientAge: data.patientAge,
     policy: {
       ...data.policy,
+      inceptionDate: scrubInceptionDate(data.policy.inceptionDate),
       pedWaitMonths: data.policy.pedWaitMonths ?? undefined,
       roomRent: { type: data.policy.roomRent.type, value: data.policy.roomRent.value ?? undefined },
     },

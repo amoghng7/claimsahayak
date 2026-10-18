@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fileToDocTextSmart, ocrFile } from '../ocr'
+import { TRUNCATION_NOTE, fileToDocTextSmart, ocrFile } from '../ocr'
 
 function makeFile(name: string, type: string, content: string): File {
   return new File([content], name, { type })
@@ -72,8 +72,29 @@ describe('fileToDocTextSmart', () => {
     expect(d.ocr).toBe(false)
   })
 
-  it('truncates to 30,000 chars like the local path', async () => {
+  it('truncates to 30,000 chars with a visible marker, like the local path', async () => {
     const d = await fileToDocTextSmart(makeFile('big.txt', 'text/plain', 'x'.repeat(31_000)), deps)
-    expect(d.text).toHaveLength(30_000)
+    expect(d.text).toHaveLength(30_000 + TRUNCATION_NOTE.length)
+    expect(d.text).toContain('[NOTE: document truncated at 30,000 characters')
+    expect(d.text.split('[NOTE:').length - 1).toBe(1) // exactly one marker
+  })
+
+  it('leaves text under the cap untouched — no marker', async () => {
+    const d = await fileToDocTextSmart(makeFile('small.txt', 'text/plain', 'short text file'), deps)
+    expect(d.text).toBe('short text file')
+    expect(d.text).not.toContain('[NOTE:')
+  })
+
+  it('replaces the server-side marker with its own — still exactly one', async () => {
+    // The server caps at the same 30,000 and appends its marker; the client
+    // slice must strip it whole and append its own (caps must stay in sync).
+    const serverCapped = 'y'.repeat(30_000) + TRUNCATION_NOTE
+    const d = await fileToDocTextSmart(makeFile('scan.pdf', 'application/pdf', 'bytes'), {
+      ...deps,
+      extractPdfText: async () => '   ',
+      ocr: async () => serverCapped,
+    })
+    expect(d.text).toHaveLength(30_000 + TRUNCATION_NOTE.length)
+    expect(d.text.split('[NOTE:').length - 1).toBe(1)
   })
 })

@@ -11,7 +11,7 @@ The portal is the authority — re-open it before submitting and reconcile this 
 - [ ] **Deployed link** — <https://claimsahayak-tvghig4oya-el.a.run.app>
   - [x] Loads fresh (fresh browser context, no console errors) — verified via
         `scratch/phase07-live-smoke.cjs`
-  - [x] All three sample cases run — verified (Room-rent trap / Clean claim / Rejected — PED ground)
+  - [x] All three sample cases run — verified (Room-rent trap / Clean claim / Rejected, PED)
   - [x] Managed proxy works — verified (`POST /api/gemini/generate` → 200 JSON from Gemini)
   - [ ] Re-run the smoke script on the final tagged build before submitting
 - [ ] **Video demo, under 3 minutes** — script + rehearsal automation in
