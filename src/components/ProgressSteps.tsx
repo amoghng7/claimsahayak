@@ -19,14 +19,14 @@ const STEPS: { id: DeskPhase; no: string; short: string; title: string; detail: 
     no: '02',
     short: 'Scan',
     title: 'Run the scan',
-    detail: 'One pass. Nothing to configure — the desk reads the file and prices every trap.',
+    detail: 'The desk reads the file and prices each trap.',
   },
   {
     id: 'results',
     no: '03',
     short: 'Result',
     title: 'Get the result',
-    detail: 'A readiness score, plus the suggestions that raise the chance this claim is paid.',
+    detail: 'The score, and what you can still do before you file.',
   },
 ]
 
@@ -111,9 +111,8 @@ function DeskProgress({
       data-tab={tab}
       data-print-hidden
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2 px-4 pt-5 sm:px-5 md:px-7">
+      <div className="px-4 pt-5 sm:px-5 md:px-7">
         <Kicker ok={phase === 'results'}>{kicker}</Kicker>
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-ink-3">Nothing else to learn</span>
       </div>
 
       <div role="tablist" aria-label="How a claim moves through the desk" onKeyDown={onKeyDown}>
@@ -223,17 +222,17 @@ function DeskProgress({
 }
 
 function panelCopy(tab: DeskPhase, phase: DeskPhase): string {
-  if (tab === 'upload') return 'Policy schedule, discharge summary, and the itemised hospital bill. Choosing them moves the bar to Scan, then to Result.'
+  if (tab === 'upload') return 'Policy schedule, discharge summary, and the itemised hospital bill.'
   if (tab === 'scan') {
     return phase === 'scan'
-      ? 'Reading the documents now. Result opens as soon as the read finishes — there is nothing to set.'
+      ? 'Reading the documents. Result opens when the read finishes.'
       : phase === 'results'
         ? 'This file is already scanned. Choose another set of papers to run it again.'
-        : 'The scan starts the moment the files are in, and Result opens when it finishes.'
+        : 'The scan starts once the files are in. Result opens when it finishes.'
   }
   return phase === 'results'
     ? STEPS[2].detail
-    : 'The score and the suggestions land here when the scan finishes. You do not have to open this step yourself.'
+    : 'The score and the suggestions show up here when the scan finishes.'
 }
 
 const primaryBtn =
@@ -279,17 +278,16 @@ export function ProgressSteps(props: ProgressStepsProps) {
   const { headingId } = props
   return (
     <section aria-labelledby={headingId} aria-label={headingId ? undefined : 'Three steps to a claim result'}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+      <div>
         <Kicker ok>Three steps</Kicker>
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-ink-3">Nothing else to learn</span>
       </div>
 
       <div className="mt-5 max-w-2xl">
         <h2 id={headingId} className="font-display text-4xl font-semibold leading-tight md:text-5xl">
-          Extremely simple to use.
+          Upload, scan, result.
         </h2>
         <p className="mt-3 max-w-xl text-base leading-relaxed text-ink-3 md:text-lg">
-          Upload the papers. Run the scan. Read the result — and the suggestions that raise the chance the claim is paid.
+          Upload the papers. Run the scan. Read the score and what to fix.
         </p>
       </div>
 

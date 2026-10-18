@@ -69,7 +69,7 @@ export function createCaseStore({ storage, fetchImpl, uuid }: CaseStoreDeps) {
 
   async function call(url: string, init: RequestInit = {}): Promise<Response> {
     const sid = sessionId()
-    if (!sid) throw new Error('Consent is off — enable server save in Settings first.')
+    if (!sid) throw new Error('Consent is off. Turn on server save in Settings first.')
     const res = await fetchImpl(url, {
       ...init,
       headers: { ...(init.body && !(init.headers as Record<string, string>)?.['Content-Type'] ? { 'Content-Type': 'application/json' } : {}), ...init.headers, 'X-Session-Id': sid },

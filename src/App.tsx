@@ -76,9 +76,7 @@ function SettingsSheet({
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Settings" className="panel max-h-[min(92dvh,40rem)] w-full max-w-md overflow-y-auto p-5 sm:p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-2xl font-semibold">Settings</h3>
         <p className="mt-2 text-sm leading-relaxed text-ink-3">
-          The desk uses a secure managed backend key to extract data from your uploaded PDFs.
-          If you prefer to use your own key (or if the backend is rate-limited), you can
-          override it here. The key never leaves your browser.
+          Paste a Gemini key if you want your own. It stays in this browser. Leave the field blank to use the site key.
         </p>
         <label htmlFor="gemini-key" className="mt-4 block font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
           Gemini API key
@@ -135,10 +133,7 @@ function SettingsSheet({
             <span>
               <span className="text-sm font-medium">Save my cases on the server</span>
               <span className="mt-1 block text-xs leading-relaxed text-ink-3">
-                Off by default — documents and analysis stay in this browser. Turn on to
-                keep a case history under an anonymous session id (no account). Cases and
-                uploaded documents are deleted automatically after 30 days; turning this
-                off deletes your saved cases immediately.
+                Off by default. Files stay in this browser. Turn on to keep cases for 30 days, with no account. Turning it off deletes them.
               </span>
             </span>
           </label>
@@ -278,9 +273,9 @@ export default function App() {
         </div>
 
         <footer className="mt-auto border-t border-line bg-paper pb-[env(safe-area-inset-bottom)]" data-print-hidden>
-          <div className="mx-auto flex max-w-shell flex-col gap-1.5 py-4 pl-4 pr-20 font-mono text-[10.5px] leading-relaxed text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:py-5 sm:pl-6 sm:pr-32">
+          <div className="mx-auto flex max-w-shell flex-col gap-1.5 px-4 py-4 font-mono text-[10.5px] leading-relaxed text-ink-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-5">
             <span>CLAIMSAHAYAK · GOOGLE CLOUD AI BUILDER CUP 2026 · JAPAC</span>
-            <span className="sm:text-right">Sample cases are fictional. Assistive analysis — not insurance or legal advice.</span>
+            <span className="sm:text-right">Made with ❤️ · Powered by Gemini</span>
           </div>
         </footer>
         <button
@@ -290,7 +285,7 @@ export default function App() {
           aria-expanded={helpOpen}
           aria-label="Help"
           data-print-hidden
-          className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full bg-chart font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink shadow-[0_1px_0_var(--ink)] transition-transform duration-150 hover:-translate-y-0.5 motion-reduce:transition-none sm:h-auto sm:w-auto sm:min-h-11 sm:px-5"
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] right-[max(1rem,env(safe-area-inset-right))] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full bg-chart font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink shadow-[0_1px_0_var(--ink)] transition-transform duration-150 hover:-translate-y-0.5 motion-reduce:transition-none sm:h-auto sm:w-auto sm:min-h-11 sm:px-5"
         >
           <span className="sm:hidden" aria-hidden>?</span>
           <span className="hidden sm:inline">Help</span>

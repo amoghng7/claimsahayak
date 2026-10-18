@@ -393,7 +393,7 @@ export function buildVerdict(c: CaseFile): Verdict {
       title: 'Room-rent sub-limit exceeded',
       detail: `Room category allows ₹${rr.allowed.toLocaleString('en-IN')}/day; the bill shows ₹${rr.actual.toLocaleString('en-IN')}/day.`,
       amountAtRisk: rr.roomCut,
-      clause: 'Policy schedule — Room Rent sub-limit. IRDAI (PPHI) Regulations 2024 require sub-limits to be prominently disclosed in the policy schedule.',
+      clause: 'Policy schedule: Room Rent sub-limit. IRDAI (PPHI) Regulations 2024 require sub-limits to be prominently disclosed in the policy schedule.',
     })
     flags.push({
       kind: 'proportional',
@@ -401,7 +401,7 @@ export function buildVerdict(c: CaseFile): Verdict {
       title: 'Proportional deduction on linked charges',
       detail: `Choosing a room at ${Math.round((1 / rr.ratio) * 100) / 100}× the allowed rate lets the insurer scale every room-linked charge by ${Math.round(rr.ratio * 100)}%.`,
       amountAtRisk: rr.proportionalCut,
-      clause: 'Policy T&C — "Proportionate Deduction": associated medical expenses are payable in the same proportion as the admissible room rent bears to the actual room rent.',
+      clause: 'Policy T&C, "Proportionate Deduction": associated medical expenses are payable in the same proportion as the admissible room rent bears to the actual room rent.',
     })
     reasons.push({ ok: false, label: `Room-rent trap: ${Math.round((1 - rr.ratio) * 100)}% proportional cut exposure` })
   } else {
@@ -415,7 +415,7 @@ export function buildVerdict(c: CaseFile): Verdict {
       title: "This treatment appears in the policy's permanent exclusions",
       detail: `The diagnosis or procedure matches: ${exclusions.hits.join(', ')}. Permanent exclusions are never payable, however old the policy.`,
       amountAtRisk: exclusions.excludedAmount,
-      clause: 'Policy schedule — Permanent Exclusions; IRDAI HPR 2024 standardised exclusion wording.',
+      clause: 'Policy schedule: Permanent Exclusions. IRDAI HPR 2024 standardised exclusion wording.',
     })
     reasons.push({ ok: false, label: `Permanent exclusion hit: ${exclusions.hits[0]}` })
   }
@@ -425,9 +425,9 @@ export function buildVerdict(c: CaseFile): Verdict {
       kind: 'ped',
       severity: 'medium',
       title: 'Non-compliant policy term: PED wait above the IRDAI cap',
-      detail: `The schedule states a ${c.policy.pedWaitMonths}-month PED waiting period, but IRDAI caps it at 36 months — the excess is unenforceable. This estimate applies the 36-month cap.`,
+      detail: `The schedule states a ${c.policy.pedWaitMonths}-month PED waiting period, but IRDAI caps it at 36 months. The excess is unenforceable. This estimate applies the 36-month cap.`,
       amountAtRisk: 0,
-      clause: 'IRDAI (Insurance Products) Regulations, 2024 — PED waiting period capped at 36 months of continuous coverage.',
+      clause: 'IRDAI (Insurance Products) Regulations, 2024: PED waiting period capped at 36 months of continuous coverage.',
     })
   }
 
@@ -436,10 +436,10 @@ export function buildVerdict(c: CaseFile): Verdict {
     flags.push({
       kind: 'ped',
       severity: 'high',
-      title: `PED waiting period not served — ${ped.matchedPed}`,
+      title: `PED waiting period not served: ${ped.matchedPed}`,
       detail: `"${ped.matchedPed}" was declared at proposal and this admission (${ped.monthsSinceStart} months into the policy) falls inside its ${ped.waitMonths}-month wait. Treatment-linked lines are excluded from the estimate.`,
       amountAtRisk: ped.excludedAmount > 0 ? ped.excludedAmount : payable.expected,
-      clause: 'Policy schedule — PED waiting period; IRDAI (Insurance Products) Regulations, 2024 (36-month cap).',
+      clause: 'Policy schedule: PED waiting period. IRDAI (Insurance Products) Regulations, 2024 (36-month cap).',
     })
     reasons.push({ ok: false, label: `PED wait breach: ${ped.matchedPed} at month ${ped.monthsSinceStart} of ${ped.waitMonths}` })
   } else if (ped.nearingCompletion && ped.completesOn) {
@@ -449,7 +449,7 @@ export function buildVerdict(c: CaseFile): Verdict {
       title: `Waiting period completes on ${formatDate(ped.completesOn)}`,
       detail: `"${ped.matchedPed}" is inside its PED wait window, but the wait ends within 3 months. If treatment can safely wait past that date, the claim clears this clause.`,
       amountAtRisk: 0,
-      clause: 'Policy schedule — PED waiting period; IRDAI (Insurance Products) Regulations, 2024.',
+      clause: 'Policy schedule: PED waiting period. IRDAI (Insurance Products) Regulations, 2024.',
     })
   }
 
@@ -462,7 +462,7 @@ export function buildVerdict(c: CaseFile): Verdict {
         title: w.label,
         detail: w.detail,
         amountAtRisk: payable.expected,
-        clause: 'Policy schedule — Waiting Periods; IRDAI HPR 2024 caps PED waits at 36 months.',
+        clause: 'Policy schedule: Waiting Periods. IRDAI HPR 2024 caps PED waits at 36 months.',
       })
     }
     reasons.push({ ok: false, label: `Waiting-period breach: ${waiting[0].label.toLowerCase()}` })
@@ -478,7 +478,7 @@ export function buildVerdict(c: CaseFile): Verdict {
       title: `${c.policy.copayPct}% co-payment applies`,
       detail: 'Co-pay is deducted from the admissible amount after all other deductions.',
       amountAtRisk: payable.copayCut,
-      clause: 'Policy schedule — Co-payment clause.',
+      clause: 'Policy schedule: Co-payment clause.',
     })
     reasons.push({ ok: false, label: `${c.policy.copayPct}% co-pay on the admissible amount` })
   }
@@ -491,7 +491,7 @@ export function buildVerdict(c: CaseFile): Verdict {
       title: 'Non-payable consumables above 4% of bill',
       detail: 'Gloves, masks, syringes and similar consumables sit on the IRDAI non-payable list.',
       amountAtRisk: payable.nonPayableCut,
-      clause: 'IRDAI non-payables list (2016 circular) — excluded items unless the policy has a consumables add-on.',
+      clause: 'IRDAI non-payables list (2016 circular). Excluded items unless the policy has a consumables add-on.',
     })
   }
 
@@ -534,29 +534,29 @@ const PATTERNS: Pattern[] = [
       if (years >= 5) {
         return {
           reversible: 'yes',
-          explanation: `The policy had run ${years.toFixed(1)} continuous years at admission — past the 5-year moratorium in IRDAI's 2024 regulations. After the moratorium, a claim cannot be repudiated for non-disclosure except on proven fraud.`,
+          explanation: `The policy had run ${years.toFixed(1)} continuous years at admission, past the 5-year moratorium in IRDAI's 2024 regulations. After the moratorium, a claim cannot be repudiated for non-disclosure except on proven fraud.`,
           steps: [
             'Reply in writing citing the moratorium: 5 continuous policy years completed.',
             'Attach the inception-to-date renewal continuity table (every renewal receipt).',
             'State that the claimed condition was never diagnosed before inception, with supporting medical history.',
-            'Demand a specific fraud finding if they wish to persist — silence on this point is winnable at the Ombudsman.',
+            'Demand a specific fraud finding if they wish to persist. Silence on this point is winnable at the Ombudsman.',
           ],
           clauses: [
-            'IRDAI (Protection of Policyholders\' Interests, Operations and Allied Matters of Insurers) Regulations, 2024 — moratorium of 5 continuous years; no repudiation thereafter except proven fraud.',
-            'IRDAI HPR 2024 — PED waiting period capped at 36 months; coverage cannot be denied beyond it.',
+            'IRDAI (Protection of Policyholders\' Interests, Operations and Allied Matters of Insurers) Regulations, 2024: moratorium of 5 continuous years; no repudiation thereafter except proven fraud.',
+            'IRDAI HPR 2024: PED waiting period capped at 36 months; coverage cannot be denied beyond it.',
           ],
         }
       }
       return {
         reversible: 'partial',
-        explanation: `The policy was ${years.toFixed(1)} years old — inside the moratorium window. The defence shifts to whether the undisclosed condition was (a) known at proposal time and (b) material to this claim. Unrelated non-disclosure does not void a claim.`,
+        explanation: `The policy was ${years.toFixed(1)} years old, inside the moratorium window. The defence shifts to whether the undisclosed condition was (a) known at proposal time and (b) material to this claim. Unrelated non-disclosure does not void a claim.`,
         steps: [
           'Obtain a treating-doctor certificate that the hospitalised condition is unrelated to the alleged undisclosed ailment.',
-          'Check proposal-form answers; if the question was ambiguous, note it — ambiguity reads against the insurer.',
+          'Check proposal-form answers. If the question was ambiguous, note it. Ambiguity reads against the insurer.',
           'If the PED waiting period (max 36 months) had run out, claim under it explicitly.',
         ],
         clauses: [
-          'IRDAI HPR 2024 — PED waiting capped at 36 months.',
+          'IRDAI HPR 2024: PED waiting capped at 36 months.',
           'Established IRDAI/Ombudsman position: non-disclosure unrelated to the claimed condition is not a valid repudiation ground.',
         ],
       }
@@ -576,7 +576,7 @@ const PATTERNS: Pattern[] = [
         'Quote the schedule clause verbatim in the reply.',
         c.episode.accidentRelated ? 'Attach the MLC/FIR to establish accidental origin.' : 'If the diagnosis is not in the specific-disease list, say so explicitly with the list attached.',
       ],
-      clauses: ['Policy schedule — Waiting Periods clause.', 'IRDAI HPR 2024 — waiting-period definitions and 36-month PED cap.'],
+      clauses: ['Policy schedule: Waiting Periods clause.', 'IRDAI HPR 2024: waiting-period definitions and 36-month PED cap.'],
     }),
   },
   {
@@ -587,11 +587,11 @@ const PATTERNS: Pattern[] = [
       reversible: 'yes',
       explanation: 'Documentation rejections are the most reversible class: the claim is closed "for non-submission", not adjudicated on merits. Insurers are required to call for all deficiencies in one go, not piecemeal.',
       steps: [
-        'Ask for the consolidated deficiency list in writing — piecemeal deficiency calls are themselves a violation.',
+        'Ask for the consolidated deficiency list in writing. Piecemeal deficiency calls are themselves a violation.',
         'Resubmit the complete set within 15 days with a covering letter and acknowledgement.',
         'Reopen the same claim number; do not file a fresh claim.',
       ],
-      clauses: ['IRDAI PPHI Regulations 2024 — insurer must raise all requirements at one time and decide within prescribed timelines.'],
+      clauses: ['IRDAI PPHI Regulations 2024: insurer must raise all requirements at one time and decide within prescribed timelines.'],
     }),
   },
   {
@@ -606,7 +606,7 @@ const PATTERNS: Pattern[] = [
         'Show no prejudice: the insurer could still verify all records.',
         'Cite IRDAI\'s position that delay alone is insufficient for repudiation.',
       ],
-      clauses: ['IRDAI guidance on condonation of delay — delay alone is not a valid ground for rejection.'],
+      clauses: ['IRDAI guidance on condonation of delay: delay alone is not a valid ground for rejection.'],
     }),
   },
   {
@@ -622,10 +622,10 @@ const PATTERNS: Pattern[] = [
           : 'The deduction must match the schedule word-for-word. Errors in applying the ratio to non-linked heads are common and recoverable.',
         steps: [
           'Recompute the proportional deduction line-by-line; challenge any ratio applied to implants, medicines or package charges.',
-          'Ask for the insurer\'s deduction worksheet — they are obliged to share the computation.',
+          'Ask for the insurer\'s deduction worksheet. They are obliged to share the computation.',
           'Recover any excess over the contractual ratio.',
         ],
-        clauses: ['Policy T&C — Proportionate Deduction clause.', 'IRDAI PPHI 2024 — deduction must be strictly per the disclosed schedule.'],
+        clauses: ['Policy T&C: Proportionate Deduction clause.', 'IRDAI PPHI 2024: deduction must be strictly per the disclosed schedule.'],
       }
     },
   },
@@ -641,7 +641,7 @@ const PATTERNS: Pattern[] = [
         'Obtain a treating-doctor note differentiating the diagnosed condition from the excluded one.',
         'If the policy was sold with the condition accepted (PED declared), invoke the acceptance.',
       ],
-      clauses: ['Policy schedule — Exclusions section.', 'IRDAI HPR 2024 — standardised exclusion wording applies.'],
+      clauses: ['Policy schedule: Exclusions section.', 'IRDAI HPR 2024: standardised exclusion wording applies.'],
     }),
   },
 ]
@@ -666,7 +666,7 @@ function unknownRejection(): RejectionVerdict {
       'Prepare a point-by-point written rebuttal with documents annexed.',
       'Escalate to the insurer\'s Grievance Cell; then Bima Bharosa / Insurance Ombudsman if unresolved in 14 days.',
     ],
-    clauses: ['IRDAI PPI Master Circular 2024 — grievance redressal timelines (14 days) and escalation route.'],
+    clauses: ['IRDAI PPI Master Circular 2024: grievance redressal timelines (14 days) and escalation route.'],
   }
 }
 

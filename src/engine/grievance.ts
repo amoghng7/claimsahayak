@@ -27,14 +27,14 @@ Interests, 2024`
   return `To,
 The Grievance Redressal Officer,
 Grievance Cell, ${p.insurer}
-[Insurer's grievance-cell address — from the policy schedule or the insurer's website]
+[Grievance-cell address, from the policy schedule or the insurer's website]
 
 Date: ${date}
 
 Policy No.: ${p.policyNo}
 Claim No.: [as stated in the repudiation letter]
 
-Subject: Appeal against repudiation of claim — Policy No. ${p.policyNo} — ${c.claimant}
+Subject: Appeal against repudiation of claim, policy ${p.policyNo}, ${c.claimant}
 
 Dear Sir/Madam,
 
@@ -59,7 +59,7 @@ failing which I shall be constrained to escalate the matter:
    1. Bima Bharosa portal (https://bimabharosa.irdai.gov.in), or by email to
       complaints@irdai.gov.in, or toll-free 155255.
    2. If the complaint remains unresolved within 30 days, the Insurance
-      Ombudsman directly — compensation up to ₹50 lakh (Insurance Ombudsman
+      Ombudsman directly. Compensation up to ₹50 lakh (Insurance Ombudsman
       Rules, 2017, as amended by G.S.R. 828(E) dated 9 November 2023). The
       insurer must comply with an award within 30 days, failing which a
       penalty of ₹5,000 per day is payable to me. The complaint may be filed
@@ -80,8 +80,7 @@ IRDAI/HLT/CIR/PRO/84/5/2024 (29 May 2024); Master Circular on Protection of
 Policyholders' Interests, 2024; Insurance Ombudsman Rules, 2017, as amended
 by G.S.R. 828(E) (9 November 2023).
 
-—
-Drafted by ClaimSahayak. Verify every fact and figure against your own
+Drafted by ClaimSahayak. Check every fact and figure against your own
 documents before sending. This letter is an assistive draft, not legal advice.`
 }
 
@@ -112,7 +111,7 @@ export function buildEscalationLadder(rejectionDate: string): EscalationStep[] {
       date: groDeadline,
       dateLabel: `reply due by ${formatDate(groDeadline)}`,
       detail:
-        'File the written grievance with the insurer\'s grievance cell now. The PPI Master Circular 2024 requires acknowledgement immediately and a reasoned decision within 14 days — and the insurer must itself point you to the Ombudsman if it cannot resolve the complaint.',
+        'File the written grievance with the insurer\'s grievance cell now. The PPI Master Circular 2024 requires acknowledgement immediately and a reasoned decision within 14 days. If it cannot resolve the complaint, the insurer must point you to the Ombudsman.',
     },
     {
       title: 'Bima Bharosa (IRDAI)',
@@ -126,7 +125,7 @@ export function buildEscalationLadder(rejectionDate: string): EscalationStep[] {
       date: ombudsmanWindow,
       dateLabel: `file by ${formatDate(ombudsmanWindow)}`,
       detail:
-        'Approach the Ombudsman directly if the complaint is unresolved 30 days after the grievance. Compensation up to ₹50 lakh (G.S.R. 828(E), 9 Nov 2023); the insurer must comply with an award within 30 days or pay ₹5,000/day. File within one year of the repudiation — delay is condonable with reasons. No fee, no lawyer needed; video-conference hearings on request.',
+        'Approach the Ombudsman directly if the complaint is unresolved 30 days after the grievance. Compensation up to ₹50 lakh (G.S.R. 828(E), 9 Nov 2023). The insurer must comply with an award within 30 days or pay ₹5,000/day. File within one year of the repudiation. Delay can be condoned with reasons. No fee, no lawyer needed. Hearings can be by video conference.',
     },
     {
       title: 'Consumer forum',

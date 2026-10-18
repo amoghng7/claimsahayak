@@ -30,7 +30,7 @@ Produce ONE JSON object (no markdown, no commentary):
   "category": one of the ids above,
   "confidence": number 0..1 — how sure you are the category is the letter's real ground,
   "citedClause": the exact policy clause or wording the letter relies on ("" if none quoted),
-  "plainLanguageReason": one or two plain sentences restating what the insurer said, for a lay reader
+  "plainLanguageReason": one or two plain sentences restating what the insurer said. No em dashes.
 }
 
 LETTER:

@@ -159,7 +159,7 @@ export const SAMPLE_CASES: CaseFile[] = [
         { head: 'Surgeon & consultant fees', amount: 90000, roomLinked: true },
         { head: 'Operation theatre charges', amount: 40000, roomLinked: true },
         { head: 'Anaesthesia charges', amount: 18000, roomLinked: true },
-        { head: 'Implant — DHS plate & screws', amount: 78000, roomLinked: false },
+        { head: 'Implant: DHS plate & screws', amount: 78000, roomLinked: false },
         { head: 'Medicines & pharmacy', amount: 22000, roomLinked: false },
         { head: 'Consumables (gloves, syringes)', amount: 8000, roomLinked: false, nonPayable: true },
         { head: 'Investigations & imaging', amount: 28000, roomLinked: false },
@@ -199,5 +199,5 @@ National Arogya Insurance Co.`,
 export const CASE_LABELS: Record<string, string> = {
   'ramesh-iyer': 'Room-rent trap',
   'meera-kulkarni': 'Clean claim',
-  'arvind-rao': 'Rejected — PED ground',
+  'arvind-rao': 'Rejected, PED',
 }

@@ -140,8 +140,7 @@ export function HelpSheet({
           {turns.length === 0 && !pending && (
             <div>
               <p className="max-w-md text-sm leading-relaxed text-ink-3">
-                Ask how the desk works — the room-rent trap, the score, a rejection, or what
-                stays in this browser. The clerk explains the product. It does not price your claim.
+                Ask about room rent, the score, a rejection, or what stays in this browser. This does not price your claim.
               </p>
               <div className="mt-4 flex flex-col items-start gap-2">
                 {HELP_STARTERS.map((starter) => (
@@ -171,7 +170,7 @@ export function HelpSheet({
                 <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">Desk clerk</p>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{turn.text}</p>
                 <p className="mt-3 border-t border-line pt-2 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-3">
-                  AI response — cross-verify
+                  Check this reply
                 </p>
               </div>
             ),
@@ -196,7 +195,7 @@ export function HelpSheet({
         >
           {keyState === 'none' && (
             <p className="mb-3 text-xs leading-relaxed text-ink-3">
-              No key is configured. Close Help, add one in Settings, and reopen. Sample cases still run without it.
+              No key set. Add one in Settings. Samples still run without it.
             </p>
           )}
           <label htmlFor="help-question" className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">

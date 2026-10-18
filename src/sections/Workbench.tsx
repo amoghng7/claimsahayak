@@ -129,8 +129,8 @@ function SavedCases({ current, onPick }: { current: CaseFile; onPick: (c: CaseFi
 
 function extractionKeyNote(): string {
   return storedPersonalKey()
-    ? 'Using your Gemini key — live extraction on.'
-    : 'Managed key — live extraction on. Add your own in Settings (top right) to override.'
+    ? 'Using your Gemini key. Live extraction is on.'
+    : 'Using the site key. Add your own in Settings if you want.'
 }
 
 function CaseRail({
@@ -191,7 +191,7 @@ function CaseRail({
           <div className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
             Drop policy + bill PDFs
           </div>
-          <div className="mt-1 text-xs text-ink-3">or .txt exports / photos — read locally, extracted with Gemini; scans go through OCR</div>
+          <div className="mt-1 text-xs text-ink-3">PDF, text, or a photo. Text stays in the browser. Scans go through OCR.</div>
         </button>
         {uploadNote && <p className="mt-2 text-xs leading-relaxed text-ink-3">{uploadNote}</p>}
         <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-3">{extractionKeyNote()}</p>
@@ -200,7 +200,7 @@ function CaseRail({
       <SavedCases current={current} onPick={onPick} />
 
       <div>
-        <PanelTitle>Policy terms read</PanelTitle>
+        <PanelTitle>Policy terms</PanelTitle>
         <dl className="font-mono text-[12px] leading-relaxed">
           {[
             ['Insurer', current.policy.insurer],
@@ -339,7 +339,7 @@ function VerdictPanel({ c, v, moves }: { c: CaseFile; v: Verdict; moves: ClaimMo
         </PanelTitle>
         {v.flags.length === 0 ? (
           <p className="text-sm text-ink-3 border border-dashed border-line px-4 py-5">
-            No deduction traps detected in this file — the exposures below are clean.
+            No deduction traps in this file.
           </p>
         ) : (
           <div className="space-y-2">
@@ -351,10 +351,10 @@ function VerdictPanel({ c, v, moves }: { c: CaseFile; v: Verdict; moves: ClaimMo
       </div>
 
       <div>
-        <PanelTitle>Expected settlement — the waterfall</PanelTitle>
+        <PanelTitle>Expected settlement</PanelTitle>
         <Waterfall v={v} />
         <p className="mt-2 font-mono text-[10.5px] text-ink-3">
-          Estimate from extracted figures. The insurer&apos;s computation is final; the point is to know the number before they tell you.
+          Estimate from these papers. The insurer&apos;s figure is final.
         </p>
       </div>
 
@@ -389,11 +389,11 @@ function VerdictPanel({ c, v, moves }: { c: CaseFile; v: Verdict; moves: ClaimMo
 
       <div>
         <PanelTitle right={<span className="font-mono text-[10px] text-ink-3">{v.missing.length} gaps</span>}>
-          Document checklist vs IRDAI standard
+          Document checklist
         </PanelTitle>
         {v.missing.length === 0 ? (
           <p className="text-sm text-ink-3 border border-dashed border-line px-4 py-5">
-            Nothing missing — every applicable document is on file.
+            Nothing missing.
           </p>
         ) : (
           <div className="space-y-px border border-line">
@@ -429,7 +429,7 @@ function VerdictPanel({ c, v, moves }: { c: CaseFile; v: Verdict; moves: ClaimMo
 function EscalationLadder({ steps }: { steps: EscalationStep[] }) {
   return (
     <div>
-      <PanelTitle>Escalation ladder — dated</PanelTitle>
+      <PanelTitle>Escalation dates</PanelTitle>
       <ol className="space-y-2">
         {steps.map((s, i) => (
           <li key={s.title} className="rise border border-line bg-paper-2/60 px-3 py-2.5" style={{ animationDelay: `${i * 80}ms` }}>
@@ -518,13 +518,13 @@ function RejectionDesk({
             </div>
             {analysis.aiAssisted && (
               <p className="font-mono text-[10px] uppercase tracking-wider text-ink-3/80">
-                classified with AI assistance — verify against the letter
+                Check this against the letter
               </p>
             )}
             <p className="text-[13px] leading-relaxed text-ink-3">{analysis.explanation}</p>
             {analysis.advisory && (
               <p className="border-l-2 border-brick pl-3 text-[12.5px] italic leading-relaxed text-ink-3">
-                AI interpretation of the letter: {analysis.advisory}
+                From the letter: {analysis.advisory}
               </p>
             )}
             <ol className="list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed">
@@ -544,7 +544,7 @@ function RejectionDesk({
       </div>
 
       {ladder && <EscalationLadder steps={ladder} />}
-      {hindiLines && <HindiPanel lines={hindiLines} title="सरल हिंदी सारांश (प्रायोगिक)" />}
+      {hindiLines && <HindiPanel lines={hindiLines} title="अस्वीकृति का हिंदी सारांश" />}
     </div>
   )
 }
@@ -577,9 +577,9 @@ function GrievancePanel({ text }: { text: string | null }) {
           </span>
         }
       >
-        Grievance letter — drafted
+        Grievance letter
       </PanelTitle>
-      <pre tabIndex={0} aria-label="Drafted grievance letter — scrollable" className="max-h-96 overflow-auto whitespace-pre-wrap border border-line bg-paper-2/70 p-4 font-mono text-[11.5px] leading-relaxed">
+      <pre tabIndex={0} aria-label="Drafted grievance letter" className="max-h-96 overflow-auto whitespace-pre-wrap border border-line bg-paper-2/70 p-4 font-mono text-[11.5px] leading-relaxed">
         {text}
       </pre>
     </div>
@@ -710,7 +710,7 @@ function BillLedger({
           )
         }
       >
-        Bill lines — check the extraction
+        Bill lines
       </PanelTitle>
       <div className="border border-line" role="region" aria-label="Bill lines editor">
         {lines.map((l, i) => (
@@ -761,7 +761,7 @@ function BillLedger({
         </div>
       </div>
       <p className="mt-2 font-mono text-[10.5px] text-ink-3">
-        Corrections recompute the verdict instantly through the same engine. The total always equals the sum of the rows above.
+        Edits update the score. The total is the sum of these rows.
       </p>
     </div>
   )
@@ -840,16 +840,16 @@ export function Workbench({
     [caseFile, verdict, analysis],
   )
   const stepStatus = useMemo(() => {
-    if (busy) return busyNote ?? 'Reading your documents. The next step opens on its own.'
+    if (busy) return busyNote ?? 'Reading your documents.'
     if (tab === 'scan') {
       return phase === 'results'
         ? 'This file is already scanned. Choose another set of papers to run it again.'
-        : 'The scan starts the moment the files are in, and Result opens when it finishes.'
+        : 'The scan starts once the files are in. Result opens when it finishes.'
     }
-    if (tab === 'upload') return 'Choose the policy and the bill. The bar moves to Scan, then Result, on its own.'
-    if (!ownFile) return 'The score lands here when the scan finishes. You do not have to open this step yourself.'
+    if (tab === 'upload') return 'Choose the policy and the bill. The bar moves to Scan, then Result.'
+    if (!ownFile) return 'The score shows up here when the scan finishes.'
     const raises = moves.filter((m) => m.impact === 'raise' && m.id !== 'ready')
-    if (moves[0]?.id === 'ready') return 'Scan complete. Nothing to add — this file is ready to submit.'
+    if (moves[0]?.id === 'ready') return 'Scan complete. This file is ready to submit.'
     if (raises.length > 0) {
       return `Scan complete. ${raises.length} suggestion${raises.length === 1 ? '' : 's'} below would raise the chance this claim is paid.`
     }
@@ -973,7 +973,7 @@ export function Workbench({
       }
       const empty = docs.filter((d) => d.text.trim().length < 40)
       if (empty.length === docs.length) {
-        setUploadNote('Could not read any text from those files — even with OCR. Try a sharper photo or a text export.')
+        setUploadNote('Could not read those files, even with OCR. Try a sharper photo or a text export.')
         finishFailed()
         return
       }
@@ -985,10 +985,10 @@ export function Workbench({
       }
       const ocrCount = docs.filter((d) => d.ocr).length
       setUploadNote(
-        `Read ${docs.length} document${docs.length > 1 ? 's' : ''}${ocrCount ? ` (${ocrCount} via OCR)` : ''} — verdict rebuilt from your file.`,
+        `Read ${docs.length} document${docs.length > 1 ? 's' : ''}${ocrCount ? ` (${ocrCount} via OCR)` : ''}. Score rebuilt from your file.`,
       )
     } catch (err) {
-      setUploadNote(err instanceof Error ? err.message : 'Extraction failed — the sample files still work.')
+      setUploadNote(err instanceof Error ? err.message : 'Extraction failed. The sample files still work.')
       finishFailed()
     } finally {
       setBusy(false)
@@ -1052,7 +1052,7 @@ export function Workbench({
             Download case JSON
           </button>
           <p className="mt-3 font-mono text-[10px] leading-relaxed text-ink-3">
-            Assistive analysis, not insurance or legal advice. Verify every figure against your own documents.
+            Not insurance or legal advice. Check every figure against your papers.
           </p>
         </div>
       </aside>
@@ -1080,7 +1080,7 @@ export function Workbench({
           <div className="bg-paper-2 px-4 py-5 sm:px-5 md:px-7">
             <h2 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Sample scan</h2>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-3">
-              Three fictional claims — a room-rent trap, a clean file, and a rejection. Your own upload still starts at the first step, and the bar moves forward on its own.
+              Three examples: a room-rent trap, a clean file, and a rejection. Your own upload still starts at step one.
             </p>
             <button
               type="button"
@@ -1111,7 +1111,7 @@ export function Workbench({
                 className="w-full border border-dashed border-ink/40 px-4 py-10 text-center transition-colors duration-150 hover:bg-paper-2/60 disabled:opacity-50 sm:px-6 sm:py-14"
               >
                 <div className="font-display text-2xl font-semibold sm:text-3xl">Drop the policy and the bill</div>
-                <div className="mt-2 text-sm text-ink-3">PDF, text, or a photo. Choosing them moves the bar to Scan, then to Result.</div>
+                <div className="mt-2 text-sm text-ink-3">PDF, text, or a photo.</div>
               </button>
               {uploadNote && <p className="mt-3 text-sm leading-relaxed text-ink-3">{uploadNote}</p>}
               <p className="mt-3 font-mono text-[10px] leading-relaxed text-ink-3">{extractionKeyNote()}</p>

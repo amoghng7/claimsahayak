@@ -32,8 +32,8 @@ export function claimMoves(c: CaseFile, v: Verdict, rejection?: RejectionVerdict
       impact: 'raise',
       title:
         rejection.reversible === 'yes'
-          ? `Answer the rejection — ${rejection.reason}`
-          : `Contest the rejection — ${rejection.reason}`,
+          ? `Answer the rejection: ${rejection.reason}`
+          : `Contest the rejection: ${rejection.reason}`,
       detail: rejection.steps[0] ?? rejection.explanation,
     })
   }
@@ -116,7 +116,7 @@ export function claimMoves(c: CaseFile, v: Verdict, rejection?: RejectionVerdict
       id: 'room',
       impact: 'know',
       title: 'The room was above the sub-limit',
-      detail: `The cap is ${formatINR(rr.allowed)} a day; the bill shows ${formatINR(rr.actual)}. Linked charges settle at ${pct}% of what was billed. File the admissible amount — disputing the ratio itself rarely succeeds.`,
+      detail: `The cap is ${formatINR(rr.allowed)} a day. The bill shows ${formatINR(rr.actual)}. Linked charges settle at ${pct}% of what was billed. File the admissible amount. Disputing the ratio itself rarely succeeds.`,
     })
   }
 
@@ -144,7 +144,7 @@ export function claimMoves(c: CaseFile, v: Verdict, rejection?: RejectionVerdict
       id: 'copay',
       impact: 'know',
       title: `A ${c.policy.copayPct}% co-pay will come off`,
-      detail: 'It applies after every other deduction. It is in the contract, so it is not a defect to fix — budget for it.',
+      detail: 'It applies after every other deduction. It is in the contract, so budget for it.',
     })
   }
 

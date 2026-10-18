@@ -148,7 +148,7 @@ describe('extractCaseWithGemini — proxy error mapping', () => {
   it('429 maps to a rate-limit message', async () => {
     mockFetchSequence(errorResponse(429))
     await expect(extractCaseWithGemini('PROXY', DOCS)).rejects.toThrow(
-      'Too many requests — wait a minute and retry.',
+      'Too many requests. Wait a minute and retry.',
     )
   })
 

@@ -63,7 +63,7 @@ export interface DocText {
 }
 
 const UNREADABLE_ERROR =
-  'The document could not be read reliably — try a clearer scan or enter the details manually.'
+  'The document could not be read reliably. Try a clearer scan or enter the details manually.'
 
 /**
  * JSON-mode call shared by extraction and the rejection classifier.
@@ -88,7 +88,7 @@ export async function requestGeminiJson(
     },
   })
   const text = candidateText(json)
-  if (!text) throw new Error('Gemini returned no content — try clearer scans, or use a sample case.')
+  if (!text) throw new Error('Gemini returned no content. Try clearer scans, or use a sample case.')
   return text
 }
 
@@ -126,16 +126,16 @@ async function callGemini(apiKey: string, body: object): Promise<unknown> {
     const detail = await res.text().catch(() => '')
     if (res.status === 428) {
       markDevKeyMissing()
-      throw new Error('No managed key in local dev — add GEMINI_API_KEY to .env or paste your own key in Settings.')
+      throw new Error('No managed key in local dev. Add GEMINI_API_KEY to .env or paste your own key in Settings.')
     }
     if (res.status === 400 || res.status === 403) {
-      throw new Error('Gemini rejected the request — check the API key. Demo mode still works without one.')
+      throw new Error('Gemini rejected the request. Check the API key. The samples still work without one.')
     }
     if (res.status === 402) {
-      throw new Error('The managed key is out of Gemini credits — add credits in AI Studio, or use your own key in Settings.')
+      throw new Error('The managed key is out of Gemini credits. Add credits in AI Studio, or use your own key in Settings.')
     }
     if (res.status === 429) {
-      throw new Error('Too many requests — wait a minute and retry.')
+      throw new Error('Too many requests. Wait a minute and retry.')
     }
     if (res.status === 502) {
       throw new Error('The analysis service is unavailable right now.')

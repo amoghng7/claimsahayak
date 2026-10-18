@@ -62,18 +62,18 @@ export function PreviousScans({ onOpen }: { onOpen: (c: CaseFile) => void }) {
       <div className="bg-paper-2 px-4 py-5 sm:px-5 md:px-7">
         <h2 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Previous scans</h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-3">
-          A finished scan is kept for 30 days under an anonymous session, and only after you turn on “Save my cases on the server” in Settings.
+          Kept for 30 days, and only if server save is on in Settings.
         </p>
       </div>
       <div className="px-4 py-6 sm:px-5 md:px-7">
         {!consent && (
           <p className="max-w-xl text-sm leading-relaxed text-ink-3">
-            Server save is off, so nothing from this browser is stored. Turn it on in Settings and the next finished scan will appear here.
+            Server save is off. Turn it on in Settings and the next scan will show up here.
           </p>
         )}
         {consent && cases === null && !note && <p className="text-sm text-ink-3">Reading your scans…</p>}
         {consent && cases && cases.length === 0 && (
-          <p className="max-w-xl text-sm leading-relaxed text-ink-3">No scans saved yet. Finish one on Your claim and it is written here.</p>
+          <p className="max-w-xl text-sm leading-relaxed text-ink-3">No scans yet. Finish one on Your claim.</p>
         )}
         {cases && cases.length > 0 && (
           <ul className="max-w-xl space-y-1">
