@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { createHandler, docaiUrl, vertexUrl } from './index.js'
+import { buildGenerateBody, createHandler, docaiUrl, vertexUrl } from './index.js'
 
 const FAKE_BODY = JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }] })
 
@@ -27,6 +27,26 @@ function req(method, url, body = '') {
     },
   }
 }
+
+describe('buildGenerateBody', () => {
+  it('rejects a prompt past the character cap', () => {
+    const built = buildGenerateBody({ contents: [{ parts: [{ text: 'a'.repeat(400_001) }] }] })
+    assert.equal(built.error, 'too_large')
+  })
+
+  it('keeps the help-clerk request shape', () => {
+    const built = buildGenerateBody({
+      systemInstruction: { parts: [{ text: 'rules' }] },
+      contents: [{ role: 'user', parts: [{ text: 'How do I use the desk?' }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 512 },
+    })
+    assert.equal(built.error, undefined)
+    assert.equal(built.body.generationConfig.maxOutputTokens, 512)
+    assert.equal(built.body.generationConfig.temperature, 0.2)
+    assert.equal(built.body.systemInstruction.parts[0].text, 'rules')
+    assert.equal(built.body.contents[0].role, 'user')
+  })
+})
 
 describe('vertexUrl', () => {
   it('builds the publisher generateContent URL from env config', () => {
@@ -58,19 +78,116 @@ describe('POST /generate', () => {
     assert.equal(calls.length, 1)
     assert.equal(calls[0].url, vertexUrl(config))
     assert.equal(calls[0].opts.headers.Authorization, 'Bearer token-123')
-    assert.equal(Buffer.from(calls[0].opts.body).toString('utf8'), FAKE_BODY)
+    const sent = JSON.parse(Buffer.from(calls[0].opts.body).toString('utf8'))
+    assert.deepEqual(sent.contents, [{ parts: [{ text: 'hi' }] }])
+    assert.equal(sent.generationConfig.maxOutputTokens, 8192)
+    assert.equal(sent.tools, undefined)
   })
 
-  it('passes through an upstream error status and body unchanged', async () => {
+  it('drops tools and safety overrides and clamps the completion size', async () => {
+    const calls = []
     const handler = createHandler({
       config,
       getToken: async () => 'token-123',
-      fetchImpl: async () => ({ status: 429, text: async () => '{"error":"quota"}' }),
+      fetchImpl: async (url, opts) => {
+        calls.push({ url, opts })
+        return { status: 200, text: async () => '{"candidates":[]}' }
+      },
+    })
+    const res = mockRes()
+    const attack = JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
+      tools: [{ functionDeclarations: [{ name: 'pwn' }] }],
+      safetySettings: [{ category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 999999, responseMimeType: 'application/json', responseSchema: { type: 'object' } },
+    })
+    await handler(req('POST', '/generate', attack), res)
+    assert.equal(res.statusCode, 200)
+    const sent = JSON.parse(Buffer.from(calls[0].opts.body).toString('utf8'))
+    assert.equal(sent.tools, undefined)
+    assert.equal(sent.safetySettings, undefined)
+    assert.equal(sent.generationConfig.maxOutputTokens, 8192)
+    assert.equal(sent.generationConfig.temperature, 0.2)
+    assert.deepEqual(sent.generationConfig.responseSchema, { type: 'object' })
+    assert.deepEqual(sent.systemInstruction, undefined)
+  })
+
+  it('rejects a cross-site call before spending a token', async () => {
+    let called = false
+    const handler = createHandler({
+      config,
+      getToken: async () => 'token-123',
+      fetchImpl: async () => { called = true; return { status: 200, text: async () => '{}' } },
+    })
+    const res = mockRes()
+    const r = req('POST', '/generate', FAKE_BODY)
+    r.headers['sec-fetch-site'] = 'cross-site'
+    await handler(r, res)
+    assert.equal(res.statusCode, 403)
+    assert.equal(called, false)
+  })
+
+  it('allows the browser Origin when the host matches, including a port', async () => {
+    let called = false
+    const handler = createHandler({
+      config,
+      getToken: async () => 'token-123',
+      fetchImpl: async () => { called = true; return { status: 200, text: async () => '{"candidates":[]}' } },
+    })
+    const res = mockRes()
+    const r = req('POST', '/generate', FAKE_BODY)
+    r.headers.origin = 'http://localhost:8080'
+    r.headers.host = 'localhost:8080'
+    r.headers['sec-fetch-site'] = 'same-origin'
+    await handler(r, res)
+    assert.equal(res.statusCode, 200)
+    assert.equal(called, true)
+  })
+
+  it('rejects a foreign Origin', async () => {
+    const handler = createHandler({
+      config,
+      getToken: async () => 'token-123',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    const r = req('POST', '/generate', FAKE_BODY)
+    r.headers.origin = 'https://evil.example'
+    r.headers.host = 'claimsahayak.example'
+    await handler(r, res)
+    assert.equal(res.statusCode, 403)
+  })
+
+  it('rejects a form post and an inline image part', async () => {
+    const handler = createHandler({
+      config,
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const form = mockRes()
+    const formReq = req('POST', '/generate', 'contents=hi')
+    formReq.headers['content-type'] = 'application/x-www-form-urlencoded'
+    await handler(formReq, form)
+    assert.equal(form.statusCode, 415)
+
+    const image = mockRes()
+    await handler(req('POST', '/generate', JSON.stringify({
+      contents: [{ parts: [{ inlineData: { mimeType: 'image/png', data: 'aaaa' } }] }],
+    })), image)
+    assert.equal(image.statusCode, 400)
+  })
+
+  it('keeps an upstream error status and hides the provider body', async () => {
+    const handler = createHandler({
+      config,
+      getToken: async () => 'token-123',
+      fetchImpl: async () => ({ status: 429, text: async () => '{"error":{"message":"project claim-sahayak quota"}}' }),
     })
     const res = mockRes()
     await handler(req('POST', '/generate', FAKE_BODY), res)
     assert.equal(res.statusCode, 429)
-    assert.equal(res.body, '{"error":"quota"}')
+    assert.match(res.body, /upstream_rejected/)
+    assert.doesNotMatch(res.body, /claim-sahayak/)
   })
 
   it('answers 502 JSON when the upstream call throws', async () => {
@@ -182,16 +299,31 @@ describe('POST /ocr', () => {
     assert.match(res.body, /not_configured/)
   })
 
-  it('passes through an upstream error status and body', async () => {
+  it('keeps an upstream error status and hides the provider body', async () => {
     const handler = createHandler({
       config: { ...genConfig, docai },
       getToken: async () => 't',
-      fetchImpl: async () => ({ status: 400, text: async () => '{"error":{"message":"bad document"}}' }),
+      fetchImpl: async () => ({ status: 400, text: async () => '{"error":{"message":"projects/claim-sahayak bad document"}}' }),
     })
     const res = mockRes()
     await handler(req('POST', '/ocr', JSON.stringify({ content: 'eA==', mimeType: 'application/pdf' })), res)
     assert.equal(res.statusCode, 400)
-    assert.equal(res.body, '{"error":{"message":"bad document"}}')
+    assert.match(res.body, /upstream_rejected/)
+    assert.doesNotMatch(res.body, /claim-sahayak/)
+  })
+
+  it('rejects SVG and non-base64 payloads', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, docai },
+      getToken: async () => 't',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const svg = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'eA==', mimeType: 'image/svg+xml' })), svg)
+    assert.equal(svg.statusCode, 415)
+    const junk = mockRes()
+    await handler(req('POST', '/ocr', JSON.stringify({ content: 'not base64', mimeType: 'application/pdf' })), junk)
+    assert.equal(junk.statusCode, 400)
   })
 
   it('answers 502 JSON when the upstream call throws', async () => {
@@ -259,6 +391,20 @@ describe('POST /api/cases/:caseId', () => {
     assert.equal(expireAt - savedAt, 30 * 24 * 60 * 60 * 1000)
   })
 
+  it('answers 400 for a case id that is not a slug', async () => {
+    const handler = createHandler({
+      config: { ...genConfig, store, bucket: 'b' },
+      getToken: async () => 'tok',
+      fetchImpl: async () => ({ status: 200, text: async () => '{}' }),
+    })
+    const res = mockRes()
+    await handler(storeReq('PUT', '/api/cases/..', '{}'), res)
+    assert.equal(res.statusCode, 400)
+    const dotted = mockRes()
+    await handler(storeReq('PUT', '/api/cases/a.b', '{}'), dotted)
+    assert.equal(dotted.statusCode, 400)
+  })
+
   it('answers 401 when the session id is missing or malformed', async () => {
     const handler = createHandler({
       config: { ...genConfig, store, bucket: 'b' },
@@ -271,6 +417,9 @@ describe('POST /api/cases/:caseId', () => {
     const res2 = mockRes()
     await handler(req('PUT', '/api/cases/case-1', '{}'), res2)
     assert.equal(res2.statusCode, 401)
+    const res3 = mockRes()
+    await handler(storeReq('GET', '/api/cases', '', '11111111-2222-3333-8444-555555555555'), res3)
+    assert.equal(res3.statusCode, 401)
   })
 
   it('answers 503 when Firestore is not configured', async () => {
@@ -357,6 +506,8 @@ describe('POST /api/cases/:caseId', () => {
     const res = mockRes()
     await handler(storeReq('POST', '/api/uploads?name=bill.pdf', 'PDFBYTES'), res)
     assert.equal(res.statusCode, 200)
+    assert.deepEqual(JSON.parse(res.body), { ok: true })
+    assert.doesNotMatch(res.body, /claimsahayak-docs/)
     assert.match(calls[0].url, /upload\/storage\/v1\/b\/claimsahayak-docs\/o\?uploadType=media&name=/)
     assert.match(calls[0].url, /uploads%2F11111111-2222-4333-8444-555555555555%2F/)
     assert.equal(Buffer.from(calls[0].opts.body).toString('utf8'), 'PDFBYTES')

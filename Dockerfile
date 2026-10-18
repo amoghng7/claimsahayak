@@ -15,8 +15,10 @@ RUN apk add --no-cache nodejs npm
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Copy custom nginx config
+# Copy custom nginx config. The snippet is included by locations that set
+# their own add_header; it must not live under templates/ (envsubst).
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 
 # Sidecar service + its production deps
 COPY server/package.json server/package-lock.json /app/server/

@@ -1,7 +1,10 @@
-# Rate-limit zone for the Gemini proxy (http context — this template is
-# included from conf.d). $binary_remote_addr survives envsubst: the nginx
-# image only substitutes defined environment variables.
+# Rate-limit zones (http context — this template is included from conf.d).
+# $binary_remote_addr survives envsubst: the nginx image only substitutes
+# defined environment variables. real_ip below rewrites it to the client
+# address Cloud Run appended, so one visitor cannot spend the whole zone.
+# apiglobal is the cost ceiling for the service, above a single client's cap.
 limit_req_zone $binary_remote_addr zone=gemini:1m rate=20r/m;
+limit_req_zone $server_name zone=apiglobal:1m rate=60r/m;
 
 server {
     listen ${PORT};
@@ -9,14 +12,16 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # --- Security headers ---
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
-    # connect-src allows the Gemini BYOK override (browser-direct Developer API).
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none';" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # Cloud Run connects from 169.254.8.129 and appends the client it saw as
+    # the last X-Forwarded-For hop. Trust only that link-local range so a
+    # caller cannot rotate the limit key by sending their own header.
+    set_real_ip_from 169.254.0.0/16;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
+    # Locations that set their own add_header must include this again.
+    # nginx does not inherit add_header once a child defines any.
+    include /etc/nginx/snippets/security-headers.conf;
 
     # --- Secure Backend Proxy for Gemini ---
     location = /api/gemini/generate {
@@ -25,16 +30,19 @@ server {
             deny all;
         }
 
-        # Abuse protection: 20 req/min per client IP, short burst, JSON errors
+        # 20 req/min per client, plus a service-wide ceiling. JSON errors.
         limit_req zone=gemini burst=10 nodelay;
+        limit_req zone=apiglobal burst=20 nodelay;
         limit_req_status 429;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
         # PDF text payloads are small; 4 MB is generous headroom
         client_max_body_size 4m;
 
         # Sidecar in the same container calls Vertex AI with the Cloud Run
         # service account (ADC) — no API key material in this config at all.
         proxy_pass http://127.0.0.1:8081/generate;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
 
         proxy_connect_timeout 10s;
         proxy_read_timeout 60s;
@@ -56,11 +64,14 @@ server {
         }
 
         limit_req zone=gemini burst=10 nodelay;
+        limit_req zone=apiglobal burst=20 nodelay;
         limit_req_status 429;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
         client_max_body_size 1m;
 
         proxy_pass http://127.0.0.1:8081;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_connect_timeout 10s;
         proxy_read_timeout 30s;
 
@@ -78,11 +89,14 @@ server {
         }
 
         limit_req zone=gemini burst=10 nodelay;
+        limit_req zone=apiglobal burst=20 nodelay;
         limit_req_status 429;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
         client_max_body_size 15m;
 
         proxy_pass http://127.0.0.1:8081;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_connect_timeout 10s;
         proxy_read_timeout 120s;
 
@@ -96,6 +110,8 @@ server {
 
     location @json429 {
         default_type application/json;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
         return 429 '{"error":"rate_limited","message":"Too many requests — wait a minute and retry."}';
     }
 
@@ -106,12 +122,15 @@ server {
         }
 
         limit_req zone=gemini burst=10 nodelay;
+        limit_req zone=apiglobal burst=20 nodelay;
         limit_req_status 429;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
         # Scanned PDFs/photos as base64; Document AI online limit is 20 MB binary
         client_max_body_size 15m;
 
         proxy_pass http://127.0.0.1:8081/ocr;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
 
         proxy_connect_timeout 10s;
         # OCR of a multi-page scan is slower than a text round-trip
@@ -127,12 +146,17 @@ server {
 
     location @upstream_error {
         default_type application/json;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
         return 502 '{"error":"upstream_unavailable","message":"The analysis service is unavailable right now."}';
     }
 
     # --- SPA routing: serve index.html for all paths ---
+    # HTML is not immutable: it points at the hashed bundles and carries the CSP.
     location / {
         try_files $uri $uri/ /index.html;
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-cache";
     }
 
     # --- ES module workers (pdf.js): nginx mime.types has no .mjs mapping,
@@ -140,12 +164,14 @@ server {
     location ~* \.mjs$ {
         default_type text/javascript;
         expires 1y;
+        include /etc/nginx/snippets/security-headers.conf;
         add_header Cache-Control "public, immutable";
     }
 
     # --- Cache static assets aggressively ---
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
         expires 1y;
+        include /etc/nginx/snippets/security-headers.conf;
         add_header Cache-Control "public, immutable";
     }
 

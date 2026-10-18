@@ -4,8 +4,9 @@ import { GoogleAuth } from 'google-auth-library'
 // ClaimSahayak sidecar: same-origin backend inside the nginx container.
 // /generate re-implements the old nginx proxy against Vertex AI with
 // Application Default Credentials — no API key material anywhere; IAM and
-// Cloud Logging govern access. The request/response contract is byte-identical
-// to the Gemini Developer API generateContent call the SPA already makes.
+// Cloud Logging govern access. A successful response is the Vertex
+// generateContent JSON. The request is an allow-listed text call: tools,
+// safety-filter overrides, and oversized completions are not forwarded.
 
 export function vertexUrl({ project, location, model }) {
   const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`
@@ -20,7 +21,34 @@ export function docaiUrl({ project, location, processor }) {
 // sessions/{sessionId}/cases/{caseId}; the session id is a client-generated
 // UUID sent as X-Session-Id — anonymous, no accounts, created only after the
 // user opts in. Documents go to a GCS bucket with a 30-day lifecycle rule.
-const SESSION_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+// Version-4 only: the id is the bearer token, so nil/v1 UUIDs are rejected.
+const SESSION_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+// Sample ids are slugs (`ramesh-iyer`); live ids are `live-<epoch>`. Dots and
+// slashes are rejected so a case id cannot be a Firestore path segment.
+const CASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$/
+
+const MAX_PROMPT_CHARS = 400_000
+const MAX_OUTPUT_TOKENS = 8192
+const MAX_SCHEMA_CHARS = 100_000
+const MAX_OCR_CHARS = 14_000_000
+const MAX_CASE_PAYLOAD = 400_000
+const MAX_CASE_NAME = 200
+const OCR_TEXT_CAP = 30_000
+const OCR_MIMES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/tiff',
+])
+const BODY_LIMIT = {
+  generate: 1024 * 1024,
+  ocr: 15 * 1024 * 1024,
+  cases: 512 * 1024,
+  upload: 15 * 1024 * 1024,
+}
 
 export function firestoreColUrl({ project }, sid) {
   return `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/sessions/${sid}/cases`
@@ -35,23 +63,183 @@ function sessionId(req, res) {
   return sid
 }
 
-async function callUpstream(res, fetchImpl, url, opts) {
-  const upstream = await fetchImpl(url, opts)
-  res.statusCode = upstream.status
-  res.setHeader('Content-Type', 'application/json')
-  res.end(await upstream.text())
+// Never reflect a Google error body. Vertex, Document AI, Firestore and GCS
+// include the project id and resource path, and nginx only rewrites 5xx.
+function upstreamError(res, status, message) {
+  const code = status >= 400 && status <= 599 ? status : 502
+  json(res, code, { error: 'upstream_rejected', message })
+}
+
+// Browsers cannot spoof Sec-Fetch-Site, and a cross-site form cannot set
+// application/json or application/octet-stream. Missing headers stay allowed
+// so curl, the health probe, and the Vite dev forwarder keep working.
+function blocked(req, res, expectedType) {
+  const site = String(req.headers['sec-fetch-site'] || '').toLowerCase()
+  if (site === 'cross-site' || site === 'same-site') {
+    json(res, 403, { error: 'forbidden', message: 'Cross-site request blocked.' })
+    return true
+  }
+  const origin = req.headers.origin
+  if (origin) {
+    let originHost = ''
+    try {
+      originHost = new URL(origin).host
+    } catch {
+      json(res, 403, { error: 'forbidden', message: 'Cross-site request blocked.' })
+      return true
+    }
+    // $http_host keeps a non-default port. Browsers also drop :80 and :443.
+    const norm = (h) => h.trim().toLowerCase().replace(/:(80|443)$/, '')
+    if (norm(originHost) !== norm(req.headers.host || '')) {
+      json(res, 403, { error: 'forbidden', message: 'Cross-site request blocked.' })
+      return true
+    }
+  }
+  if (expectedType) {
+    const raw = String(req.headers['content-type'] || '')
+    const ct = raw.split(';', 1)[0].trim().toLowerCase()
+    if (ct && ct !== expectedType) {
+      json(res, 415, { error: 'unsupported_media_type', message: 'Unsupported content type.' })
+      return true
+    }
+  }
+  return false
+}
+
+function tooLarge(message) {
+  return Object.assign(new Error(message), { status: 413 })
 }
 
 // Raw bytes. JSON routes decode with .toString('utf8') themselves; binary
 // routes (/api/uploads) must never pass through a string — UTF-8 decode +
 // re-encode would destroy any non-UTF-8 byte sequence (i.e. every real PDF).
-function readBody(req) {
+function readBody(req, limit) {
   return new Promise((resolve, reject) => {
     const chunks = []
-    req.on('data', (c) => chunks.push(c))
-    req.on('end', () => resolve(Buffer.concat(chunks)))
-    req.on('error', reject)
+    let total = 0
+    let settled = false
+    const fail = (err) => {
+      if (settled) return
+      settled = true
+      reject(err)
+    }
+    req.on('data', (c) => {
+      if (settled) return
+      total += c.length
+      if (total > limit) {
+        fail(tooLarge('Request is too large.'))
+        if (typeof req.destroy === 'function') req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
+    req.on('end', () => {
+      if (settled) return
+      settled = true
+      resolve(Buffer.concat(chunks))
+    })
+    req.on('error', fail)
   })
+}
+
+function textParts(parts) {
+  if (!Array.isArray(parts) || parts.length === 0 || parts.length > 4) return null
+  const out = []
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') return null
+    if (Object.keys(part).length !== 1 || typeof part.text !== 'string') return null
+    out.push({ text: part.text })
+  }
+  return out
+}
+
+// The SPA builds the prompt, but the route is public. Rebuild an allow-listed
+// body so a caller cannot attach tools, disable safety filters, or ask for a
+// huge completion. Anything else is dropped.
+export function buildGenerateBody(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return { error: 'bad_request' }
+  if (!Array.isArray(payload.contents) || payload.contents.length === 0 || payload.contents.length > 12) {
+    return { error: 'bad_request' }
+  }
+  let chars = 0
+  const contents = []
+  for (const turn of payload.contents) {
+    if (!turn || typeof turn !== 'object') return { error: 'bad_request' }
+    const parts = textParts(turn.parts)
+    if (!parts) return { error: 'bad_request' }
+    if (turn.role !== undefined && turn.role !== 'user' && turn.role !== 'model') return { error: 'bad_request' }
+    for (const part of parts) chars += part.text.length
+    contents.push(turn.role ? { role: turn.role, parts } : { parts })
+  }
+  let systemInstruction
+  if (payload.systemInstruction !== undefined) {
+    if (!payload.systemInstruction || typeof payload.systemInstruction !== 'object') return { error: 'bad_request' }
+    const parts = textParts(payload.systemInstruction.parts)
+    if (!parts) return { error: 'bad_request' }
+    for (const part of parts) chars += part.text.length
+    systemInstruction = { parts }
+  }
+  if (chars > MAX_PROMPT_CHARS) return { error: 'too_large' }
+
+  const incoming = payload.generationConfig
+  const generationConfig = {}
+  if (incoming !== undefined) {
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return { error: 'bad_request' }
+    if (incoming.temperature !== undefined) {
+      const temperature = Number(incoming.temperature)
+      if (!Number.isFinite(temperature)) return { error: 'bad_request' }
+      generationConfig.temperature = Math.min(1, Math.max(0, temperature))
+    }
+    const requested = incoming.maxOutputTokens === undefined ? MAX_OUTPUT_TOKENS : Number(incoming.maxOutputTokens)
+    if (!Number.isFinite(requested) || requested < 1) return { error: 'bad_request' }
+    generationConfig.maxOutputTokens = Math.min(MAX_OUTPUT_TOKENS, Math.floor(requested))
+    if (incoming.responseMimeType !== undefined) {
+      if (incoming.responseMimeType !== 'application/json') return { error: 'bad_request' }
+      generationConfig.responseMimeType = 'application/json'
+    }
+    if (incoming.responseSchema !== undefined) {
+      let encoded
+      try {
+        encoded = JSON.stringify(incoming.responseSchema)
+      } catch {
+        return { error: 'bad_request' }
+      }
+      if (!encoded || encoded.length > MAX_SCHEMA_CHARS) return { error: 'bad_request' }
+      generationConfig.responseSchema = incoming.responseSchema
+    }
+  } else {
+    generationConfig.maxOutputTokens = MAX_OUTPUT_TOKENS
+  }
+
+  const body = { contents, generationConfig }
+  if (systemInstruction) body.systemInstruction = systemInstruction
+  return { body }
+}
+
+function ocrMime(value) {
+  const mime = String(value || 'application/pdf').toLowerCase().split(';', 1)[0].trim()
+  return mime === 'image/jpg' ? 'image/jpeg' : mime
+}
+
+function isBase64(value) {
+  return typeof value === 'string' && value.length > 0 && value.length % 4 === 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(value)
+}
+
+function caseIdFrom(raw) {
+  let caseId
+  try {
+    caseId = decodeURIComponent(raw)
+  } catch {
+    return null
+  }
+  return CASE_ID_RE.test(caseId) ? caseId : null
+}
+
+async function storeResult(res, upstream, okBody, message) {
+  // Drain so the socket can be reused, but do not show the provider body.
+  await upstream.text().catch(() => '')
+  if (upstream.status >= 200 && upstream.status < 300) return json(res, 200, okBody)
+  return upstreamError(res, upstream.status, message)
 }
 
 function json(res, status, body) {
@@ -68,19 +256,35 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
 
     if (path === '/generate') {
       if (req.method !== 'POST') return json(res, 405, { error: 'method_not_allowed' })
+      if (blocked(req, res, 'application/json')) return
       if (!config.project) return json(res, 503, { error: 'not_configured', message: 'VERTEX_PROJECT is not set' })
       try {
-        const body = await readBody(req)
+        const raw = await readBody(req, BODY_LIMIT.generate)
+        let payload
+        try {
+          payload = JSON.parse(raw.toString('utf8'))
+        } catch {
+          return json(res, 400, { error: 'bad_request', message: 'Body must be JSON.' })
+        }
+        const built = buildGenerateBody(payload)
+        if (built.error === 'too_large') return json(res, 413, { error: 'too_large', message: 'The document text is too large.' })
+        if (!built.body) return json(res, 400, { error: 'bad_request', message: 'The request is not a text generation call.' })
         const token = await getToken()
         const upstream = await fetchImpl(vertexUrl(config), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body,
+          body: JSON.stringify(built.body),
+          signal: AbortSignal.timeout(55_000),
         })
+        if (upstream.status < 200 || upstream.status >= 300) {
+          await upstream.text().catch(() => '')
+          return upstreamError(res, upstream.status, 'The analysis service rejected the request.')
+        }
         res.statusCode = upstream.status
         res.setHeader('Content-Type', 'application/json')
         res.end(await upstream.text())
-      } catch {
+      } catch (err) {
+        if (err?.status === 413) return json(res, 413, { error: 'too_large', message: err.message })
         json(res, 502, { error: 'upstream_unavailable', message: 'The analysis service is unavailable right now.' })
       }
       return
@@ -88,29 +292,37 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
 
     if (path === '/ocr') {
       if (req.method !== 'POST') return json(res, 405, { error: 'method_not_allowed' })
+      if (blocked(req, res, 'application/json')) return
       if (!config.docai?.processor) return json(res, 503, { error: 'not_configured', message: 'DOCAI_PROCESSOR is not set' })
       let payload
       try {
-        payload = JSON.parse((await readBody(req)).toString('utf8'))
-      } catch {
+        payload = JSON.parse((await readBody(req, BODY_LIMIT.ocr)).toString('utf8'))
+      } catch (err) {
+        if (err?.status === 413) return json(res, 413, { error: 'too_large', message: 'Request is too large.' })
         return json(res, 400, { error: 'bad_request', message: 'Body must be JSON: { content: base64, mimeType }' })
       }
-      if (!payload?.content) return json(res, 400, { error: 'bad_request', message: 'Missing base64 content' })
+      const mime = ocrMime(payload?.mimeType)
+      if (!OCR_MIMES.has(mime)) return json(res, 415, { error: 'unsupported_media_type', message: 'Only PDF and photo scans can be read.' })
+      if (typeof payload?.content === 'string' && payload.content.length > MAX_OCR_CHARS) {
+        return json(res, 413, { error: 'too_large', message: 'The scan is too large.' })
+      }
+      if (!isBase64(payload?.content)) {
+        return json(res, 400, { error: 'bad_request', message: 'Missing base64 content' })
+      }
       try {
         const token = await getToken()
         const upstream = await fetchImpl(docaiUrl(config.docai), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ rawDocument: { content: payload.content, mimeType: payload.mimeType || 'application/pdf' } }),
+          body: JSON.stringify({ rawDocument: { content: payload.content, mimeType: mime } }),
+          signal: AbortSignal.timeout(110_000),
         })
         if (upstream.status !== 200) {
-          res.statusCode = upstream.status
-          res.setHeader('Content-Type', 'application/json')
-          res.end(await upstream.text())
-          return
+          await upstream.text().catch(() => '')
+          return upstreamError(res, upstream.status, 'The OCR service rejected the document.')
         }
         const data = JSON.parse(await upstream.text())
-        json(res, 200, { text: data?.document?.text ?? '' })
+        json(res, 200, { text: String(data?.document?.text ?? '').slice(0, OCR_TEXT_CAP) })
       } catch {
         json(res, 502, { error: 'upstream_unavailable', message: 'The OCR service is unavailable right now.' })
       }
@@ -119,33 +331,58 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
 
     const casesMatch = path.match(/^\/api\/cases(?:\/([^/]+))?$/)
     if (casesMatch) {
+      if (blocked(req, res, req.method === 'PUT' ? 'application/json' : '')) return
       const sid = sessionId(req, res)
       if (!sid) return
       if (!config.store?.project) return json(res, 503, { error: 'not_configured', message: 'FIRESTORE_PROJECT is not set' })
-      const caseId = casesMatch[1] ? decodeURIComponent(casesMatch[1]) : null
+      const caseId = casesMatch[1] ? caseIdFrom(casesMatch[1]) : null
+      if (casesMatch[1] && !caseId) return json(res, 400, { error: 'bad_request', message: 'Malformed case id.' })
       const colUrl = firestoreColUrl(config.store, sid)
       try {
         const token = await getToken()
         const authHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
         if (req.method === 'PUT' && caseId) {
-          const body = JSON.parse((await readBody(req)).toString('utf8'))
+          let body
+          try {
+            body = JSON.parse((await readBody(req, BODY_LIMIT.cases)).toString('utf8'))
+          } catch (err) {
+            if (err?.status === 413) return json(res, 413, { error: 'too_large', message: 'Request is too large.' })
+            return json(res, 400, { error: 'bad_request', message: 'Body must be JSON.' })
+          }
+          if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            return json(res, 400, { error: 'bad_request', message: 'Body must be a JSON object.' })
+          }
+          if (body.name !== undefined && typeof body.name !== 'string') {
+            return json(res, 400, { error: 'bad_request', message: 'Case name must be text.' })
+          }
+          if (body.payload !== undefined && typeof body.payload !== 'string') {
+            return json(res, 400, { error: 'bad_request', message: 'Case payload must be text.' })
+          }
+          const payload = body.payload ?? '{}'
+          if (payload.length > MAX_CASE_PAYLOAD) return json(res, 413, { error: 'too_large', message: 'Case is too large to store.' })
           const now = Date.now()
-          await callUpstream(res, fetchImpl, `${colUrl}/${encodeURIComponent(caseId)}`, {
+          const upstream = await fetchImpl(`${colUrl}/${encodeURIComponent(caseId)}`, {
             method: 'PATCH',
             headers: authHeaders,
             body: JSON.stringify({
               fields: {
-                name: { stringValue: String(body.name ?? caseId) },
+                name: { stringValue: String(body.name ?? caseId).slice(0, MAX_CASE_NAME) },
                 savedAt: { timestampValue: new Date(now).toISOString() },
                 // TTL policy on expireAt (Firestore deletes docs whose TTL
                 // field is in the past) — the 30-day retention promise
                 expireAt: { timestampValue: new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString() },
-                payload: { stringValue: String(body.payload ?? '{}') },
+                payload: { stringValue: payload },
               },
             }),
+            signal: AbortSignal.timeout(25_000),
           })
+          await storeResult(res, upstream, { ok: true }, 'The case store rejected the request.')
         } else if (req.method === 'GET' && !caseId) {
-          const upstream = await fetchImpl(colUrl, { headers: authHeaders })
+          const upstream = await fetchImpl(colUrl, { headers: authHeaders, signal: AbortSignal.timeout(25_000) })
+          if (upstream.status !== 200) {
+            await upstream.text().catch(() => '')
+            return upstreamError(res, upstream.status, 'The case store rejected the request.')
+          }
           const data = JSON.parse(await upstream.text())
           const cases = (data.documents ?? []).map((d) => ({
             id: d.name.split('/').pop(),
@@ -154,12 +391,10 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
           }))
           json(res, 200, { cases })
         } else if (req.method === 'GET' && caseId) {
-          const upstream = await fetchImpl(`${colUrl}/${encodeURIComponent(caseId)}`, { headers: authHeaders })
+          const upstream = await fetchImpl(`${colUrl}/${encodeURIComponent(caseId)}`, { headers: authHeaders, signal: AbortSignal.timeout(25_000) })
           if (upstream.status !== 200) {
-            res.statusCode = upstream.status
-            res.setHeader('Content-Type', 'application/json')
-            res.end(await upstream.text())
-            return
+            await upstream.text().catch(() => '')
+            return upstreamError(res, upstream.status, upstream.status === 404 ? 'Case not found.' : 'The case store rejected the request.')
           }
           const data = JSON.parse(await upstream.text())
           json(res, 200, {
@@ -168,21 +403,31 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
             payload: data.fields?.payload?.stringValue ?? '{}',
           })
         } else if (req.method === 'DELETE' && caseId) {
-          await callUpstream(res, fetchImpl, `${colUrl}/${encodeURIComponent(caseId)}`, { method: 'DELETE', headers: authHeaders })
+          const upstream = await fetchImpl(`${colUrl}/${encodeURIComponent(caseId)}`, {
+            method: 'DELETE',
+            headers: authHeaders,
+            signal: AbortSignal.timeout(25_000),
+          })
+          await storeResult(res, upstream, { ok: true }, 'The case store rejected the request.')
         } else if (req.method === 'DELETE' && !caseId) {
           // Opt-out purge: wipe the whole session's cases so turning the
           // consent toggle off leaves nothing server-side.
-          const list = await fetchImpl(colUrl, { headers: authHeaders })
+          const list = await fetchImpl(colUrl, { headers: authHeaders, signal: AbortSignal.timeout(25_000) })
+          if (list.status !== 200) {
+            await list.text().catch(() => '')
+            return upstreamError(res, list.status, 'The case store rejected the request.')
+          }
           const data = JSON.parse(await list.text())
           for (const d of data.documents ?? []) {
             const id = d.name.split('/').pop()
-            await fetchImpl(`${colUrl}/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders })
+            await fetchImpl(`${colUrl}/${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders, signal: AbortSignal.timeout(25_000) })
           }
           json(res, 200, { purged: (data.documents ?? []).length })
         } else {
           json(res, 405, { error: 'method_not_allowed' })
         }
-      } catch {
+      } catch (err) {
+        if (err?.status === 413) return json(res, 413, { error: 'too_large', message: err.message })
         json(res, 502, { error: 'upstream_unavailable', message: 'The case store is unavailable right now.' })
       }
       return
@@ -190,23 +435,29 @@ export function createHandler({ config, getToken, fetchImpl = fetch }) {
 
     if (path === '/api/uploads') {
       if (req.method !== 'POST') return json(res, 405, { error: 'method_not_allowed' })
+      if (blocked(req, res, 'application/octet-stream')) return
       const sid = sessionId(req, res)
       if (!sid) return
       if (!config.bucket) return json(res, 503, { error: 'not_configured', message: 'GCS_BUCKET is not set' })
       try {
-        const body = await readBody(req)
+        const body = await readBody(req, BODY_LIMIT.upload)
         const name = new URL(req.url, 'http://x').searchParams.get('name') || 'document'
-        const safe = name.replace(/[^\w.-]+/g, '_').slice(-80)
+        const safe = name.replace(/[^\w.-]+/g, '_').slice(-80) || 'document'
         const object = `uploads/${sid}/${Date.now()}-${safe}`
         const token = await getToken()
         const upstream = await fetchImpl(
           `https://storage.googleapis.com/upload/storage/v1/b/${config.bucket}/o?uploadType=media&name=${encodeURIComponent(object)}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` }, body },
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${token}` },
+            body,
+            signal: AbortSignal.timeout(110_000),
+          },
         )
-        res.statusCode = upstream.status
-        res.setHeader('Content-Type', 'application/json')
-        res.end(await upstream.text())
-      } catch {
+        // The GCS JSON names the bucket and the object. The desk only needs success.
+        await storeResult(res, upstream, { ok: true }, 'The document store rejected the upload.')
+      } catch (err) {
+        if (err?.status === 413) return json(res, 413, { error: 'too_large', message: 'Request is too large.' })
         json(res, 502, { error: 'upstream_unavailable', message: 'The document store is unavailable right now.' })
       }
       return

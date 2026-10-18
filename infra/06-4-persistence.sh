@@ -15,9 +15,11 @@ gcloud services enable firestore.googleapis.com storage.googleapis.com --project
 gcloud firestore databases create --location="$REGION" --type=firestore-native --project="$PROJECT" \
   2>&1 | grep -v "already exists" || true
 
-# Bucket with uniform bucket-level access + 30-day auto-delete
+# Bucket with uniform bucket-level access, public access prevention, and a
+# 30-day auto-delete. PAP is what stops an allUsers binding from publishing
+# uploaded policy schedules and bills.
 gcloud storage buckets create "gs://$BUCKET" --location="$REGION" --uniform-bucket-level-access \
-  --project="$PROJECT" 2>&1 | grep -v "already exists" || true
+  --public-access-prevention --project="$PROJECT" 2>&1 | grep -v "already exists" || true
 
 LIFECYCLE=$(mktemp)
 cat > "$LIFECYCLE" <<'JSON'
@@ -25,6 +27,7 @@ cat > "$LIFECYCLE" <<'JSON'
 JSON
 gcloud storage buckets update "gs://$BUCKET" --lifecycle-file="$LIFECYCLE"
 rm -f "$LIFECYCLE"
+gcloud storage buckets update "gs://$BUCKET" --uniform-bucket-level-access --public-access-prevention
 
 gcloud projects add-iam-policy-binding "$PROJECT" \
   --member="serviceAccount:$RUNTIME_SA" --role="roles/datastore.user" > /dev/null
